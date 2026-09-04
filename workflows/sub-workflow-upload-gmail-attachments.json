@@ -1,0 +1,285 @@
+{
+  "name": "Sub \u2014 Upload Gmail Attachments",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "bca58d4f-5f0c-4963-9ee2-631109fa12e3",
+      "name": "Trigger \u2014 Receive Email Data",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Receives the normalized email item from the main workflow: messageId, label, senderName, receivedDateFolder, driveRootFolderId, attachmentsMeta[].",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Folder names must not contain characters Drive/other tools choke on.\nfunction sanitize(name) {\n  return String(name || 'Unknown')\n    .replace(/[\\\\/:*?\"<>|]/g, '-')\n    .replace(/\\s+/g, ' ')\n    .trim()\n    .slice(0, 100) || 'Unknown';\n}\nconst j = $json;\nreturn [{\n  json: {\n    ...j,\n    labelFolderName: sanitize(j.label),\n    dateFolderName: sanitize(j.receivedDateFolder),\n    senderFolderName: sanitize(j.senderName),\n  }\n}];"
+      },
+      "id": "e4f8c1ac-71d2-4f46-90a6-e1da7041d39e",
+      "name": "Code \u2014 Sanitize Folder Names",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find-or-create the 'Label' folder. Reuses it if present so we\n// never create duplicate folders across runs.\nconst j = $json;\nconst parentId = j.driveRootFolderId;\nconst folderName = j.labelFolderName;\n\nconst searchQuery = `name='${folderName.replace(/'/g, \"\\\\'\")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;\n\nconst found = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleDriveOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://www.googleapis.com/drive/v3/files',\n    qs: { q: searchQuery, fields: 'files(id,name)', spaces: 'drive' },\n    json: true,\n  }\n);\n\nlet folderId;\nif (found.files && found.files.length > 0) {\n  folderId = found.files[0].id;\n} else {\n  const created = await this.helpers.httpRequestWithAuthentication.call(\n    this,\n    'googleDriveOAuth2Api',\n    {\n      method: 'POST',\n      url: 'https://www.googleapis.com/drive/v3/files',\n      body: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },\n      json: true,\n    }\n  );\n  folderId = created.id;\n}\n\nreturn [{ json: { ...j, labelFolderId: folderId } }];"
+      },
+      "id": "2133fe57-1946-4910-8041-6212add386f9",
+      "name": "Code \u2014 Get Or Create Label Folder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Uses this node's own Google Drive credential (attach it after import: Settings tab \u2192 Credential). Search-then-create in one call = no duplicate folders, no orphaned branches.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find-or-create the 'Date' folder. Reuses it if present so we\n// never create duplicate folders across runs.\nconst j = $json;\nconst parentId = j.labelFolderId;\nconst folderName = j.dateFolderName;\n\nconst searchQuery = `name='${folderName.replace(/'/g, \"\\\\'\")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;\n\nconst found = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleDriveOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://www.googleapis.com/drive/v3/files',\n    qs: { q: searchQuery, fields: 'files(id,name)', spaces: 'drive' },\n    json: true,\n  }\n);\n\nlet folderId;\nif (found.files && found.files.length > 0) {\n  folderId = found.files[0].id;\n} else {\n  const created = await this.helpers.httpRequestWithAuthentication.call(\n    this,\n    'googleDriveOAuth2Api',\n    {\n      method: 'POST',\n      url: 'https://www.googleapis.com/drive/v3/files',\n      body: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },\n      json: true,\n    }\n  );\n  folderId = created.id;\n}\n\nreturn [{ json: { ...j, dateFolderId: folderId } }];"
+      },
+      "id": "c05d437e-ff41-4f6f-96a6-b1c707441b14",
+      "name": "Code \u2014 Get Or Create Date Folder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        780,
+        0
+      ],
+      "notes": "Uses this node's own Google Drive credential (attach it after import: Settings tab \u2192 Credential). Search-then-create in one call = no duplicate folders, no orphaned branches.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find-or-create the 'Sender' folder. Reuses it if present so we\n// never create duplicate folders across runs.\nconst j = $json;\nconst parentId = j.dateFolderId;\nconst folderName = j.senderFolderName;\n\nconst searchQuery = `name='${folderName.replace(/'/g, \"\\\\'\")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;\n\nconst found = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleDriveOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://www.googleapis.com/drive/v3/files',\n    qs: { q: searchQuery, fields: 'files(id,name)', spaces: 'drive' },\n    json: true,\n  }\n);\n\nlet folderId;\nif (found.files && found.files.length > 0) {\n  folderId = found.files[0].id;\n} else {\n  const created = await this.helpers.httpRequestWithAuthentication.call(\n    this,\n    'googleDriveOAuth2Api',\n    {\n      method: 'POST',\n      url: 'https://www.googleapis.com/drive/v3/files',\n      body: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },\n      json: true,\n    }\n  );\n  folderId = created.id;\n}\n\nreturn [{ json: { ...j, senderFolderId: folderId } }];"
+      },
+      "id": "f52f0733-c6b9-402b-87cc-521e6c92f3e8",
+      "name": "Code \u2014 Get Or Create Sender Folder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        0
+      ],
+      "notes": "Uses this node's own Google Drive credential (attach it after import: Settings tab \u2192 Credential). Search-then-create in one call = no duplicate folders, no orphaned branches.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "attachmentsMeta",
+        "options": {
+          "destinationFieldName": "attachment"
+        }
+      },
+      "id": "7530bdab-e4eb-4282-a18b-3cf879ee3fdb",
+      "name": "Split \u2014 Each Attachment",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        0
+      ],
+      "notes": "Splits the attachments array into one item per file. 'Include other fields' keeps senderFolderId/messageId available on every resulting item.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAttachment",
+        "messageId": "={{$json.messageId}}",
+        "attachmentId": "={{$json.attachment.attachmentId}}",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "id": "60b5c074-92b8-49b2-85a9-e2d5c1002da3",
+      "name": "Gmail \u2014 Download Attachment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1560,
+        0
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "Preserves the raw attachment bytes as binary data 'data', ready for Drive upload.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "name": "={{$json.attachment.filename}}",
+        "options": {
+          "parents": [
+            "={{$json.senderFolderId}}"
+          ]
+        },
+        "binaryPropertyName": "data"
+      },
+      "id": "396454fc-98c2-4dab-bc8a-ecd73324dfa8",
+      "name": "Drive \u2014 Upload Attachment",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1820,
+        0
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "Filename comes straight from the original Gmail attachment metadata \u2014 never renamed. MIME type is inferred by Drive from the binary data.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "uploads"
+      },
+      "id": "de83f429-8e94-4afe-af3a-c9f412520a73",
+      "name": "Aggregate \u2014 Collect Uploaded Files",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        0
+      ],
+      "notes": "Combines however many attachments this one email had back into a single item, so the main workflow gets exactly one result per email.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Collect every upload result, then carry the original email data\n// back to the parent workflow so it can be logged in Sheets.\n// The Split node preserves all parent fields on each split item, so each\n// upload item still has messageId, senderName, label, etc.\nconst input = $input.first().json;\nconst uploads = input.uploads || [];\nconst driveFileIds = uploads.map(u => u.json && u.json.id).filter(Boolean);\nconst driveFileLinks = uploads.map(u => u.json && u.json.webViewLink).filter(Boolean);\nconst anyFailed = uploads.some(u => u.json && u.json.error);\n\n// Recover the original email metadata from the first upload item\n// (it carries the full parent payload through the Split \u2192 Download \u2192 Upload chain)\nconst emailMeta = (uploads[0] && uploads[0].json) || input;\n\nreturn [{\n  json: {\n    ...emailMeta,\n    driveFileIds,\n    driveFileLinks,\n    uploadedCount: driveFileIds.length,\n    uploadStatus: anyFailed ? 'error' : 'ok',\n  }\n}];"
+      },
+      "id": "77592630-f7a8-44db-a973-8b3f1035ec0a",
+      "name": "Code \u2014 Build Final Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        2340,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Trigger \u2014 Receive Email Data": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Sanitize Folder Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Sanitize Folder Names": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Get Or Create Label Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Get Or Create Label Folder": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Get Or Create Date Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Get Or Create Date Folder": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Get Or Create Sender Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Get Or Create Sender Folder": {
+      "main": [
+        [
+          {
+            "node": "Split \u2014 Each Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split \u2014 Each Attachment": {
+      "main": [
+        [
+          {
+            "node": "Gmail \u2014 Download Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail \u2014 Download Attachment": {
+      "main": [
+        [
+          {
+            "node": "Drive \u2014 Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive \u2014 Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Aggregate \u2014 Collect Uploaded Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate \u2014 Collect Uploaded Files": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Build Final Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

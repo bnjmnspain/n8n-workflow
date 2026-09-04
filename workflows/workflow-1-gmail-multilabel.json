@@ -1,0 +1,471 @@
+{
+  "name": "Gmail Multi-Label \u2192 Sheets + Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "e3f2372d-033c-4970-bb40-2600ebf5e982",
+      "name": "Schedule \u2014 Poll Gmail",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Interval is configurable. Change 'minutesInterval' (e.g. 5 / 10 / 15) or switch the field to 'hours'/'cronExpression' as needed.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"gmailLabelsCsv\": \"={{$env.GMAIL_LABELS || 'label1,label2,label3,Invoices,Receipts,Documents'}}\",\n  \"spreadsheetId\": \"={{$env.GMAIL_SHEET_ID}}\",\n  \"sheetName\": \"={{$env.GMAIL_SHEET_NAME || 'Email Log'}}\",\n  \"driveRootFolderId\": \"={{$env.GMAIL_DRIVE_ROOT_FOLDER_ID}}\",\n  \"lookbackWindow\": \"={{$env.GMAIL_LOOKBACK_WINDOW || '1d'}}\",\n  \"timezone\": \"={{$env.WORKFLOW_TIMEZONE || 'Asia/Manila'}}\",\n  \"dateFormat\": \"={{$env.DATE_FORMAT || 'YYYY-MM-DD'}}\"\n}"
+      },
+      "id": "55e72167-a130-437b-8428-7826d75e62d3",
+      "name": "Config \u2014 Load Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ],
+      "notes": "All environment-driven so the workflow never needs editing to add/remove a label, change the sheet, or change the Drive root folder.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$json.spreadsheetId}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{$json.sheetName}}",
+          "mode": "list"
+        },
+        "options": {
+          "dataStartRow": 1
+        }
+      },
+      "id": "a916d8fd-7914-4867-b43e-bceff077df32",
+      "name": "Sheets \u2014 Read Existing Message IDs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        520,
+        0
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "Reads the whole log tab once per run (cheap for a poll-every-few-minutes job) so we can build an in-memory de-dup set instead of doing a slow per-row lookup for every single email.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Collapse the log sheet into a Set of Message IDs we've already handled.\nconst rows = $input.all();\nconst ids = new Set(\n  rows\n    .map(r => r.json['Message ID'] || r.json.messageId)\n    .filter(Boolean)\n);\nreturn [{ json: { processedIds: Array.from(ids) } }];"
+      },
+      "id": "ee47b1fe-b21e-4e8c-8b03-c0dc9bc8b86d",
+      "name": "Code \u2014 Build Processed ID Set",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        780,
+        0
+      ],
+      "notes": "Runs once regardless of whether the sheet is empty, so the workflow still works correctly on its very first execution.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Turn the comma-separated label config into one item per label so\n// every downstream node (Gmail search, etc.) simply runs once per item.\nconst cfg = $('Config \u2014 Load Settings').first().json;\nconst labels = cfg.gmailLabelsCsv.split(',').map(l => l.trim()).filter(Boolean);\nreturn labels.map(label => ({ json: { ...cfg, label } }));"
+      },
+      "id": "e866cd58-173f-4064-a1e2-c7a1cf9bdfaf",
+      "name": "Code \u2014 Expand Labels To Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        0
+      ],
+      "notes": "This is the 'don't hard-code a single label' step \u2014 add or remove a label by editing GMAIL_LABELS only, no workflow changes needed.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 50,
+        "simple": false,
+        "filters": {
+          "q": "=label:\"{{$json.label}}\" newer_than:{{$json.lookbackWindow}}"
+        }
+      },
+      "id": "5ce04438-4b8d-4036-95ee-56a7e81c40a0",
+      "name": "Gmail \u2014 Search Messages By Label",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1300,
+        0
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "'simple: false' returns the raw payload (headers + parts) which we need for attachment detection. Runs once per label item from the previous node.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Flatten the raw Gmail payload into the columns the Sheets log expects,\n// and flag duplicates using the set built earlier in this execution.\nconst msg = $json;\nconst headers = (msg.payload && msg.payload.headers) || [];\nconst getHeader = (name) => {\n  const h = headers.find(h => h.name.toLowerCase() === name.toLowerCase());\n  return h ? h.value : '';\n};\n\nconst fromHeader = getHeader('From');\nconst match = fromHeader.match(/\"?([^\"<]*)\"?\\s*<?([^<>\\s]+@[^<>\\s]+)>?/);\nconst senderName = (match && match[1] ? match[1].trim() : fromHeader) || 'Unknown Sender';\nconst senderEmail = (match && match[2]) || fromHeader;\n\nconst parts = (msg.payload && msg.payload.parts) || [];\nconst attachmentsMeta = parts\n  .filter(p => p.filename && p.filename.length > 0 && p.body && p.body.attachmentId)\n  .map(p => ({ attachmentId: p.body.attachmentId, filename: p.filename, mimeType: p.mimeType }));\n\nconst receivedMs = Number(msg.internalDate || Date.now());\nconst receivedIso = new Date(receivedMs).toISOString();\nconst receivedDateFolder = receivedIso.slice(0, 10); // YYYY-MM-DD\n\nconst cfg = $('Config \u2014 Load Settings').first().json;\nconst processedIds = $('Code \u2014 Build Processed ID Set').first().json.processedIds;\nconst isDuplicate = processedIds.includes(msg.id);\n\nreturn [{\n  json: {\n    messageId: msg.id,\n    threadId: msg.threadId,\n    senderName,\n    senderEmail,\n    recipient: getHeader('To'),\n    subject: getHeader('Subject') || '(no subject)',\n    label: msg.label,\n    receivedIso,\n    receivedDateFolder,\n    snippet: msg.snippet || '',\n    hasAttachment: attachmentsMeta.length > 0,\n    attachmentCount: attachmentsMeta.length,\n    attachmentsMeta,\n    isDuplicate,\n    spreadsheetId: cfg.spreadsheetId,\n    sheetName: cfg.sheetName,\n    driveRootFolderId: cfg.driveRootFolderId,\n  }\n}];"
+      },
+      "id": "260dcb9c-cc76-4765-a845-64b12728db73",
+      "name": "Code \u2014 Normalize Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        0
+      ],
+      "notes": "Single source of truth for 'what does a normalized email record look like'. Missing-sender emails fall back to 'Unknown Sender' rather than erroring out.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.isDuplicate}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "2008a318-a132-4ffd-9c00-85615fb39e38",
+      "name": "Check \u2014 Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        0
+      ],
+      "notes": "True branch = skip (already logged). False branch = continue processing.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {},
+      "id": "ddb3b9ee-afd7-489c-9ea1-c0b52609f9bd",
+      "name": "Skip \u2014 Duplicate Message",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        -120
+      ],
+      "notes": "Dead-end for messages whose Message ID is already in the log sheet.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.hasAttachment}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a256cf13-5a58-45ab-b4e0-50f05ce56eb2",
+      "name": "Check \u2014 Has Attachments?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SUB_WORKFLOW_ID",
+          "mode": "list",
+          "cachedResultName": "Sub \u2014 Upload Gmail Attachments"
+        },
+        "mode": "each"
+      },
+      "id": "8e9c95e3-57d0-485e-bd87-2747a8a498b3",
+      "name": "Run \u2014 Upload Gmail Attachments",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2340,
+        60
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "Calls the companion sub-workflow (Sub \u2014 Upload Gmail Attachments.json). After import, open this node and pick that workflow from the dropdown \u2014 n8n assigns the workflowId when both are in the same instance.",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, driveFileIds: [], driveFileLinks: [], uploadedCount: 0 } }];"
+      },
+      "id": "33552192-f753-4788-a08a-b9474a84ab5a",
+      "name": "Code \u2014 No Attachments To Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        2340,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalizes the shape whether we came from the attachment sub-workflow\n// or the no-attachment shortcut, and finalizes the processing status.\nconst j = $json;\nconst driveFileIds = j.driveFileIds || [];\nconst uploadFailed = j.uploadStatus === 'error';\nreturn [{\n  json: {\n    ...j,\n    driveFileIds,\n    processingStatus: uploadFailed ? 'Error' : 'Success',\n    errorMessage: uploadFailed ? (j.errorMessage || 'Attachment upload failed') : '',\n    processedAt: new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "5043b2dc-3138-4269-9041-beb2c2786e6f",
+      "name": "Code \u2014 Merge Attachment Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        2600,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$json.spreadsheetId}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{$json.sheetName}}",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Message ID": "={{$json.messageId}}",
+            "Thread ID": "={{$json.threadId}}",
+            "Sender Name": "={{$json.senderName}}",
+            "Sender Email": "={{$json.senderEmail}}",
+            "Recipient": "={{$json.recipient}}",
+            "Subject": "={{$json.subject}}",
+            "Label": "={{$json.label}}",
+            "Received Date": "={{$json.receivedIso}}",
+            "Has Attachment": "={{$json.hasAttachment ? 'Yes' : 'No'}}",
+            "Attachment Count": "={{$json.attachmentCount}}",
+            "Drive File Links": "={{($json.driveFileLinks || []).join(', ')}}",
+            "Processing Status": "={{$json.processingStatus}}",
+            "Error Message": "={{$json.errorMessage}}",
+            "Processed At": "={{$json.processedAt}}"
+          }
+        }
+      },
+      "id": "4797c049-112d-404c-a550-b60041495483",
+      "name": "Sheets \u2014 Log Email",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2860,
+        120
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "One row per email, regardless of which label it came from.",
+      "notesInFlow": false
+    }
+  ],
+  "connections": {
+    "Schedule \u2014 Poll Gmail": {
+      "main": [
+        [
+          {
+            "node": "Config \u2014 Load Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config \u2014 Load Settings": {
+      "main": [
+        [
+          {
+            "node": "Sheets \u2014 Read Existing Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets \u2014 Read Existing Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Build Processed ID Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Build Processed ID Set": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Expand Labels To Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Expand Labels To Items": {
+      "main": [
+        [
+          {
+            "node": "Gmail \u2014 Search Messages By Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail \u2014 Search Messages By Label": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Normalize Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Normalize Email Data": {
+      "main": [
+        [
+          {
+            "node": "Check \u2014 Already Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check \u2014 Already Processed?": {
+      "main": [
+        [
+          {
+            "node": "Skip \u2014 Duplicate Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check \u2014 Has Attachments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check \u2014 Has Attachments?": {
+      "main": [
+        [
+          {
+            "node": "Run \u2014 Upload Gmail Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code \u2014 No Attachments To Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run \u2014 Upload Gmail Attachments": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Merge Attachment Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 No Attachments To Upload": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Merge Attachment Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Merge Attachment Result": {
+      "main": [
+        [
+          {
+            "node": "Sheets \u2014 Log Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
