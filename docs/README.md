@@ -138,7 +138,7 @@ Once n8n is up, open `http://localhost:5678` and create the owner account.
 > open** — closing the window kills n8n. The editor stays reachable at
 > `http://localhost:5678` from any browser.
 
-# 5. For shortcut 
+# 3.a.b For shortcut 
 cmd.exe /c "set NODE_PATH=C:\n8n-deps\node_modules&& set N8N_USER_FOLDER=C:\n8n-install\.n8n&& C:\n8n-install\node_modules\.bin\n8n.cmd start"
 
 then press "o" for to openn browsers
@@ -226,13 +226,13 @@ must match exactly — the Sheets nodes map by header.
 
 ---
 
-## 3. Configuration
+## 4. Configuration
 
 Every value called out in the assessment is environment-driven — see
 `CONFIGURATION.md` for the full table and `.env.example` for a ready-to-copy
 file. Nothing required to change is hard-coded inside the workflow JSON.
 
-## 4. Duplicate Prevention
+## 5. Duplicate Prevention
 
 - **Workflow 1:** Gmail **Message ID** is the identity. The log sheet is read
   once per scheduled run; a Code node builds a `Set` of already-logged
@@ -246,7 +246,7 @@ Both intentionally avoid the "Sheets lookup filtered by value" pattern for
 the reason explained in the Executive Summary — it fails silently on the
 exact case (not a duplicate) you need it to pass.
 
-## 5. Error Handling
+## 6. Error Handling
 
 `continueOnFail` is set on every node that calls an external API (Gmail
 search/download, Sheets read/append, Drive folder/upload, Telegram send,
@@ -256,13 +256,13 @@ error-message columns rather than throwing — so one bad email or one
 unreadable receipt never stops the batch. See `TESTING.md` for the specific
 failure cases exercised.
 
-## 6. Testing
+## 7. Testing
 
 See `TESTING.md` for the full test matrix (attachment counts, per-label
 coverage, duplicate messages, missing sender, bad/blurry receipts, non-photo
 messages, Gemini/Drive failures).
 
-## 7. Files In This Portfolio
+## 8. Files In This Portfolio
 
 ```
 workflows/
