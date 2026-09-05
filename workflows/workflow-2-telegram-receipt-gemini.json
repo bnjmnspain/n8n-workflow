@@ -319,11 +319,12 @@
         "resource": "folder",
         "operation": "create",
         "name": "={{$json.dateFolder}}",
-        "options": {
-          "parents": [
-            "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID}}"
-          ]
-        }
+        "folderId": {
+          "__rl": true,
+          "value": "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID}}",
+          "mode": "id"
+        },
+        "options": {}
       },
       "id": "e6cc4fab-69e1-4c6d-acf5-20e169ddbd10",
       "name": "Drive — Create Date Folder",
@@ -335,17 +336,29 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Native Google Drive node. 'Folder already exists' error is expected and swallowed by continueOnFail — the next node looks up the existing folder."
+      "notes": "Native Google Drive node. 'Folder already exists' error is expected and swallowed by continueOnFail — the next node looks up the existing folder.",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
-        "resource": "folder",
-        "operation": "list",
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "name",
+        "queryString": "={{$json.dateFolder}}",
+        "returnAll": false,
+        "limit": 50,
         "filter": {
-          "name": "={{$json.dateFolder}}",
-          "parents": [
-            "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID}}"
-          ]
+          "folderId": {
+            "__rl": true,
+            "value": "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID}}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
         },
         "options": {}
       },
@@ -356,7 +369,13 @@
       "position": [
         2860,
         380
-      ]
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
@@ -375,13 +394,14 @@
       "parameters": {
         "resource": "file",
         "operation": "upload",
+        "inputDataFieldName": "data",
         "name": "={{$json.fileName}}",
-        "options": {
-          "parents": [
-            "={{$json.dateFolderId}}"
-          ]
+        "folderId": {
+          "__rl": true,
+          "value": "={{$json.dateFolderId}}",
+          "mode": "id"
         },
-        "binaryPropertyName": "data"
+        "options": {}
       },
       "id": "0f043a5f-ccab-42f3-8edc-1d0820a9a0ba",
       "name": "Drive — Upload Receipt Photo",
@@ -393,7 +413,13 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Uploads the untouched original photo — never the AI-processed version."
+      "notes": "Uploads the untouched original photo — never the AI-processed version.",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
@@ -695,5 +721,6 @@
   "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": false
-  }
+  },
+  "id": "workflow-2"
 }

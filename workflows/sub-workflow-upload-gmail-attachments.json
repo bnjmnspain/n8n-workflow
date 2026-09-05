@@ -33,11 +33,12 @@
         "resource": "folder",
         "operation": "create",
         "name": "={{$json.labelFolderName}}",
-        "options": {
-          "parents": [
-            "={{$json.driveRootFolderId}}"
-          ]
-        }
+        "folderId": {
+          "__rl": true,
+          "value": "={{$json.driveRootFolderId}}",
+          "mode": "id"
+        },
+        "options": {}
       },
       "id": "2133fe57-1946-4910-8041-6212add386f9",
       "name": "Drive — Create Label Folder",
@@ -49,17 +50,29 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Native Google Drive node with OAuth2 credential. Continue-on-fail is on so a 'folder already exists' error doesn't halt the run — we then look it up in the next node."
+      "notes": "Native Google Drive node with OAuth2 credential. Continue-on-fail is on so a 'folder already exists' error doesn't halt the run — we then look it up in the next node.",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
-        "resource": "folder",
-        "operation": "list",
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "name",
+        "queryString": "={{$json.labelFolderName}}",
+        "returnAll": false,
+        "limit": 50,
         "filter": {
-          "name": "={{$json.labelFolderName}}",
-          "parents": [
-            "={{$json.driveRootFolderId}}"
-          ]
+          "folderId": {
+            "__rl": true,
+            "value": "={{$json.driveRootFolderId}}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
         },
         "options": {}
       },
@@ -71,7 +84,13 @@
         780,
         0
       ],
-      "notes": "Search by exact name + parent. Returns the existing folder, OR a fresh empty list if the create just succeeded (Drive search index is eventually-consistent — in that case the Code node falls back to the create node's output)."
+      "notes": "Search by exact name + parent. Returns the existing folder, OR a fresh empty list if the create just succeeded (Drive search index is eventually-consistent — in that case the Code node falls back to the create node's output).",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
@@ -91,11 +110,12 @@
         "resource": "folder",
         "operation": "create",
         "name": "={{$json.dateFolderName}}",
-        "options": {
-          "parents": [
-            "={{$json.labelFolderId}}"
-          ]
-        }
+        "folderId": {
+          "__rl": true,
+          "value": "={{$json.labelFolderId}}",
+          "mode": "id"
+        },
+        "options": {}
       },
       "id": "c05d437e-ff41-4f6f-96a6-b1c707441b14",
       "name": "Drive — Create Date Folder",
@@ -106,17 +126,29 @@
         0
       ],
       "continueOnFail": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
-        "resource": "folder",
-        "operation": "list",
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "name",
+        "queryString": "={{$json.dateFolderName}}",
+        "returnAll": false,
+        "limit": 50,
         "filter": {
-          "name": "={{$json.dateFolderName}}",
-          "parents": [
-            "={{$json.labelFolderId}}"
-          ]
+          "folderId": {
+            "__rl": true,
+            "value": "={{$json.labelFolderId}}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
         },
         "options": {}
       },
@@ -127,7 +159,13 @@
       "position": [
         1560,
         0
-      ]
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
@@ -147,11 +185,12 @@
         "resource": "folder",
         "operation": "create",
         "name": "={{$json.senderFolderName}}",
-        "options": {
-          "parents": [
-            "={{$json.dateFolderId}}"
-          ]
-        }
+        "folderId": {
+          "__rl": true,
+          "value": "={{$json.dateFolderId}}",
+          "mode": "id"
+        },
+        "options": {}
       },
       "id": "f52f0733-c6b9-402b-87cc-521e6c92f3e8",
       "name": "Drive — Create Sender Folder",
@@ -162,17 +201,29 @@
         0
       ],
       "continueOnFail": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
-        "resource": "folder",
-        "operation": "list",
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "name",
+        "queryString": "={{$json.senderFolderName}}",
+        "returnAll": false,
+        "limit": 50,
         "filter": {
-          "name": "={{$json.senderFolderName}}",
-          "parents": [
-            "={{$json.dateFolderId}}"
-          ]
+          "folderId": {
+            "__rl": true,
+            "value": "={{$json.dateFolderId}}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
         },
         "options": {}
       },
@@ -183,7 +234,13 @@
       "position": [
         2340,
         0
-      ]
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
@@ -241,13 +298,14 @@
       "parameters": {
         "resource": "file",
         "operation": "upload",
+        "inputDataFieldName": "data",
         "name": "={{$json.attachment.filename}}",
-        "options": {
-          "parents": [
-            "={{$json.senderFolderId}}"
-          ]
+        "folderId": {
+          "__rl": true,
+          "value": "={{$json.senderFolderId}}",
+          "mode": "id"
         },
-        "binaryPropertyName": "data"
+        "options": {}
       },
       "id": "396454fc-98c2-4dab-bc8a-ecd73324dfa8",
       "name": "Drive — Upload Attachment",
@@ -259,7 +317,13 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Filename comes straight from the original Gmail attachment metadata — never renamed."
+      "notes": "Filename comes straight from the original Gmail attachment metadata — never renamed.",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "1",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
@@ -467,5 +531,6 @@
   "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": false
-  }
+  },
+  "id": "sub-wf-001"
 }

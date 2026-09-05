@@ -1,5 +1,5 @@
-﻿{
-  "name": "Gmail Multi-Label \u2192 Sheets + Drive",
+{
+  "name": "Gmail Multi-Label → Sheets + Drive",
   "nodes": [
     {
       "parameters": {
@@ -13,7 +13,7 @@
         }
       },
       "id": "e3f2372d-033c-4970-bb40-2600ebf5e982",
-      "name": "Schedule \u2014 Poll Gmail",
+      "name": "Schedule — Poll Gmail",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
       "position": [
@@ -74,7 +74,7 @@
         "options": {}
       },
       "id": "55e72167-a130-437b-8428-7826d75e62d3",
-      "name": "Config \u2014 Load Settings",
+      "name": "Config — Load Settings",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
@@ -101,7 +101,7 @@
         }
       },
       "id": "a916d8fd-7914-4867-b43e-bceff077df32",
-      "name": "Sheets \u2014 Read Existing Message IDs",
+      "name": "Sheets — Read Existing Message IDs",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
@@ -119,7 +119,7 @@
         "jsCode": "// Collapse the log sheet into a Set of Message IDs we've already handled.\nconst rows = $input.all();\nconst ids = new Set(\n  rows\n    .map(r => r.json['Message ID'] || r.json.messageId)\n    .filter(Boolean)\n);\nreturn [{ json: { processedIds: Array.from(ids) } }];"
       },
       "id": "ee47b1fe-b21e-4e8c-8b03-c0dc9bc8b86d",
-      "name": "Code \u2014 Build Processed ID Set",
+      "name": "Code — Build Processed ID Set",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -132,17 +132,17 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Turn the comma-separated label config into one item per label so\n// every downstream node (Gmail search, etc.) simply runs once per item.\n// Defensive: if the Config node produced no items or no labels, no-op gracefully.\nconst cfgNode = $('Config \u2014 Load Settings').first();\nconst cfg = (cfgNode && cfgNode.json) || {};\nconst csv = cfg.gmailLabelsCsv || 'label1,label2,label3';\nconst labels = String(csv).split(',').map(l => l.trim()).filter(Boolean);\nreturn labels.map(label => ({ json: { ...cfg, label } }));"
+        "jsCode": "// Turn the comma-separated label config into one item per label so\n// every downstream node (Gmail search, etc.) simply runs once per item.\n// Defensive: if the Config node produced no items or no labels, no-op gracefully.\nconst cfgNode = $('Config — Load Settings').first();\nconst cfg = (cfgNode && cfgNode.json) || {};\nconst csv = cfg.gmailLabelsCsv || 'label1,label2,label3';\nconst labels = String(csv).split(',').map(l => l.trim()).filter(Boolean);\nreturn labels.map(label => ({ json: { ...cfg, label } }));"
       },
       "id": "e866cd58-173f-4064-a1e2-c7a1cf9bdfaf",
-      "name": "Code \u2014 Expand Labels To Items",
+      "name": "Code — Expand Labels To Items",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
         1040,
         0
       ],
-      "notes": "This is the 'don't hard-code a single label' step \u2014 add or remove a label by editing GMAIL_LABELS only, no workflow changes needed.",
+      "notes": "This is the 'don't hard-code a single label' step — add or remove a label by editing GMAIL_LABELS only, no workflow changes needed.",
       "notesInFlow": false
     },
     {
@@ -157,7 +157,7 @@
         }
       },
       "id": "5ce04438-4b8d-4036-95ee-56a7e81c40a0",
-      "name": "Gmail \u2014 Search Messages By Label",
+      "name": "Gmail — Search Messages By Label",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
@@ -171,10 +171,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Flatten the raw Gmail payload into the columns the Sheets log expects,\n// and flag duplicates using the set built earlier in this execution.\nconst msg = $json;\nconst headers = (msg.payload && msg.payload.headers) || [];\nconst getHeader = (name) => {\n  const h = headers.find(h => h.name.toLowerCase() === name.toLowerCase());\n  return h ? h.value : '';\n};\n\nconst fromHeader = getHeader('From');\nconst match = fromHeader.match(/\"?([^\"<]*)\"?\\s*<?([^<>\\s]+@[^<>\\s]+)>?/);\nconst senderName = (match && match[1] ? match[1].trim() : fromHeader) || 'Unknown Sender';\nconst senderEmail = (match && match[2]) || fromHeader;\n\nconst parts = (msg.payload && msg.payload.parts) || [];\nconst attachmentsMeta = parts\n  .filter(p => p.filename && p.filename.length > 0 && p.body && p.body.attachmentId)\n  .map(p => ({ attachmentId: p.body.attachmentId, filename: p.filename, mimeType: p.mimeType }));\n\nconst receivedMs = Number(msg.internalDate || Date.now());\nconst receivedIso = new Date(receivedMs).toISOString();\nconst receivedDateFolder = receivedIso.slice(0, 10); // YYYY-MM-DD\n\nconst cfg = $('Config \u2014 Load Settings').first().json;\nconst processedIds = $('Code \u2014 Build Processed ID Set').first().json.processedIds;\nconst isDuplicate = processedIds.includes(msg.id);\n\nreturn [{\n  json: {\n    messageId: msg.id,\n    threadId: msg.threadId,\n    senderName,\n    senderEmail,\n    recipient: getHeader('To'),\n    subject: getHeader('Subject') || '(no subject)',\n    label: msg.label,\n    receivedIso,\n    receivedDateFolder,\n    snippet: msg.snippet || '',\n    hasAttachment: attachmentsMeta.length > 0,\n    attachmentCount: attachmentsMeta.length,\n    attachmentsMeta,\n    isDuplicate,\n    spreadsheetId: cfg.spreadsheetId,\n    sheetName: cfg.sheetName,\n    driveRootFolderId: cfg.driveRootFolderId,\n  }\n}];"
+        "jsCode": "// Flatten the raw Gmail payload into the columns the Sheets log expects,\n// and flag duplicates using the set built earlier in this execution.\nconst msg = $json;\nconst headers = (msg.payload && msg.payload.headers) || [];\nconst getHeader = (name) => {\n  const h = headers.find(h => h.name.toLowerCase() === name.toLowerCase());\n  return h ? h.value : '';\n};\n\nconst fromHeader = getHeader('From');\nconst match = fromHeader.match(/\"?([^\"<]*)\"?\\s*<?([^<>\\s]+@[^<>\\s]+)>?/);\nconst senderName = (match && match[1] ? match[1].trim() : fromHeader) || 'Unknown Sender';\nconst senderEmail = (match && match[2]) || fromHeader;\n\nconst parts = (msg.payload && msg.payload.parts) || [];\nconst attachmentsMeta = parts\n  .filter(p => p.filename && p.filename.length > 0 && p.body && p.body.attachmentId)\n  .map(p => ({ attachmentId: p.body.attachmentId, filename: p.filename, mimeType: p.mimeType }));\n\nconst receivedMs = Number(msg.internalDate || Date.now());\nconst receivedIso = new Date(receivedMs).toISOString();\nconst receivedDateFolder = receivedIso.slice(0, 10); // YYYY-MM-DD\n\nconst cfg = $('Config — Load Settings').first().json;\nconst processedIds = $('Code — Build Processed ID Set').first().json.processedIds;\nconst isDuplicate = processedIds.includes(msg.id);\n\nreturn [{\n  json: {\n    messageId: msg.id,\n    threadId: msg.threadId,\n    senderName,\n    senderEmail,\n    recipient: getHeader('To'),\n    subject: getHeader('Subject') || '(no subject)',\n    label: msg.label,\n    receivedIso,\n    receivedDateFolder,\n    snippet: msg.snippet || '',\n    hasAttachment: attachmentsMeta.length > 0,\n    attachmentCount: attachmentsMeta.length,\n    attachmentsMeta,\n    isDuplicate,\n    spreadsheetId: cfg.spreadsheetId,\n    sheetName: cfg.sheetName,\n    driveRootFolderId: cfg.driveRootFolderId,\n  }\n}];"
       },
       "id": "260dcb9c-cc76-4765-a845-64b12728db73",
-      "name": "Code \u2014 Normalize Email Data",
+      "name": "Code — Normalize Email Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -205,7 +205,7 @@
         }
       },
       "id": "2008a318-a132-4ffd-9c00-85615fb39e38",
-      "name": "Check \u2014 Already Processed?",
+      "name": "Check — Already Processed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -218,7 +218,7 @@
     {
       "parameters": {},
       "id": "ddb3b9ee-afd7-489c-9ea1-c0b52609f9bd",
-      "name": "Skip \u2014 Duplicate Message",
+      "name": "Skip — Duplicate Message",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
@@ -249,7 +249,7 @@
         }
       },
       "id": "a256cf13-5a58-45ab-b4e0-50f05ce56eb2",
-      "name": "Check \u2014 Has Attachments?",
+      "name": "Check — Has Attachments?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -264,12 +264,12 @@
           "__rl": true,
           "value": "REPLACE_WITH_SUB_WORKFLOW_ID",
           "mode": "list",
-          "cachedResultName": "Sub \u2014 Upload Gmail Attachments"
+          "cachedResultName": "Sub — Upload Gmail Attachments"
         },
         "mode": "each"
       },
       "id": "8e9c95e3-57d0-485e-bd87-2747a8a498b3",
-      "name": "Run \u2014 Upload Gmail Attachments",
+      "name": "Run — Upload Gmail Attachments",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
@@ -278,7 +278,7 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Calls the companion sub-workflow (Sub \u2014 Upload Gmail Attachments.json). After import, open this node and pick that workflow from the dropdown \u2014 n8n assigns the workflowId when both are in the same instance.",
+      "notes": "Calls the companion sub-workflow (Sub — Upload Gmail Attachments.json). After import, open this node and pick that workflow from the dropdown — n8n assigns the workflowId when both are in the same instance.",
       "notesInFlow": false
     },
     {
@@ -286,7 +286,7 @@
         "jsCode": "return [{ json: { ...$json, driveFileIds: [], driveFileLinks: [], uploadedCount: 0 } }];"
       },
       "id": "33552192-f753-4788-a08a-b9474a84ab5a",
-      "name": "Code \u2014 No Attachments To Upload",
+      "name": "Code — No Attachments To Upload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -299,7 +299,7 @@
         "jsCode": "// Normalizes the shape whether we came from the attachment sub-workflow\n// or the no-attachment shortcut, and finalizes the processing status.\nconst j = $json;\nconst driveFileIds = j.driveFileIds || [];\nconst uploadFailed = j.uploadStatus === 'error';\nreturn [{\n  json: {\n    ...j,\n    driveFileIds,\n    processingStatus: uploadFailed ? 'Error' : 'Success',\n    errorMessage: uploadFailed ? (j.errorMessage || 'Attachment upload failed') : '',\n    processedAt: new Date().toISOString(),\n  }\n}];"
       },
       "id": "5043b2dc-3138-4269-9041-beb2c2786e6f",
-      "name": "Code \u2014 Merge Attachment Result",
+      "name": "Code — Merge Attachment Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -341,7 +341,7 @@
         }
       },
       "id": "4797c049-112d-404c-a550-b60041495483",
-      "name": "Sheets \u2014 Log Email",
+      "name": "Sheets — Log Email",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
@@ -355,146 +355,146 @@
     }
   ],
   "connections": {
-    "Schedule \u2014 Poll Gmail": {
+    "Schedule — Poll Gmail": {
       "main": [
         [
           {
-            "node": "Config \u2014 Load Settings",
+            "node": "Config — Load Settings",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Config \u2014 Load Settings": {
+    "Config — Load Settings": {
       "main": [
         [
           {
-            "node": "Sheets \u2014 Read Existing Message IDs",
+            "node": "Sheets — Read Existing Message IDs",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Sheets \u2014 Read Existing Message IDs": {
+    "Sheets — Read Existing Message IDs": {
       "main": [
         [
           {
-            "node": "Code \u2014 Build Processed ID Set",
+            "node": "Code — Build Processed ID Set",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Build Processed ID Set": {
+    "Code — Build Processed ID Set": {
       "main": [
         [
           {
-            "node": "Code \u2014 Expand Labels To Items",
+            "node": "Code — Expand Labels To Items",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Expand Labels To Items": {
+    "Code — Expand Labels To Items": {
       "main": [
         [
           {
-            "node": "Gmail \u2014 Search Messages By Label",
+            "node": "Gmail — Search Messages By Label",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gmail \u2014 Search Messages By Label": {
+    "Gmail — Search Messages By Label": {
       "main": [
         [
           {
-            "node": "Code \u2014 Normalize Email Data",
+            "node": "Code — Normalize Email Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Normalize Email Data": {
+    "Code — Normalize Email Data": {
       "main": [
         [
           {
-            "node": "Check \u2014 Already Processed?",
+            "node": "Check — Already Processed?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check \u2014 Already Processed?": {
+    "Check — Already Processed?": {
       "main": [
         [
           {
-            "node": "Skip \u2014 Duplicate Message",
+            "node": "Skip — Duplicate Message",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Check \u2014 Has Attachments?",
+            "node": "Check — Has Attachments?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check \u2014 Has Attachments?": {
+    "Check — Has Attachments?": {
       "main": [
         [
           {
-            "node": "Run \u2014 Upload Gmail Attachments",
+            "node": "Run — Upload Gmail Attachments",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Code \u2014 No Attachments To Upload",
+            "node": "Code — No Attachments To Upload",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Run \u2014 Upload Gmail Attachments": {
+    "Run — Upload Gmail Attachments": {
       "main": [
         [
           {
-            "node": "Code \u2014 Merge Attachment Result",
+            "node": "Code — Merge Attachment Result",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 No Attachments To Upload": {
+    "Code — No Attachments To Upload": {
       "main": [
         [
           {
-            "node": "Code \u2014 Merge Attachment Result",
+            "node": "Code — Merge Attachment Result",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Merge Attachment Result": {
+    "Code — Merge Attachment Result": {
       "main": [
         [
           {
-            "node": "Sheets \u2014 Log Email",
+            "node": "Sheets — Log Email",
             "type": "main",
             "index": 0
           }
@@ -511,5 +511,6 @@
   "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": false
-  }
+  },
+  "id": "workflow-1"
 }
