@@ -74,7 +74,7 @@ API, Google Drive API v3, Telegram Bot API, Google Gemini API
 Want to see the workflows run before wiring up real credentials? Here's the
 fastest path on Windows.
 
-### 3a. Run n8n locally (Windows, npm)
+## 3. Run n8n locally (Windows, npm)
 
 `npx n8n start` does **not** work on a fresh machine — newer npm blocks the
 `prebuild-install` script that downloads the `sqlite3` native binding, and
@@ -138,7 +138,7 @@ Once n8n is up, open `http://localhost:5678` and create the owner account.
 > open** — closing the window kills n8n. The editor stays reachable at
 > `http://localhost:5678` from any browser.
 
-# 3.a.b For shortcut 
+## 3.a For shortcut 
 cmd.exe /c "set NODE_PATH=C:\n8n-deps\node_modules&& set N8N_USER_FOLDER=C:\n8n-install\.n8n&& C:\n8n-install\node_modules\.bin\n8n.cmd start"
 
 then press "o" for to openn browsers
