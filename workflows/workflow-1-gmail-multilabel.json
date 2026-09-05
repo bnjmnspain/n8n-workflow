@@ -26,7 +26,7 @@
     {
       "parameters": {
         "mode": "raw",
-        "jsonOutput": "{\n  \"gmailLabelsCsv\": \"={{$env.GMAIL_LABELS || 'label1,label2,label3,Invoices,Receipts,Documents'}}\",\n  \"spreadsheetId\": \"={{$env.GMAIL_SHEET_ID}}\",\n  \"sheetName\": \"={{$env.GMAIL_SHEET_NAME || 'Email Log'}}\",\n  \"driveRootFolderId\": \"={{$env.GMAIL_DRIVE_ROOT_FOLDER_ID}}\",\n  \"lookbackWindow\": \"={{$env.GMAIL_LOOKBACK_WINDOW || '1d'}}\",\n  \"timezone\": \"={{$env.WORKFLOW_TIMEZONE || 'Asia/Manila'}}\",\n  \"dateFormat\": \"={{$env.DATE_FORMAT || 'YYYY-MM-DD'}}\"\n}"
+        "jsonOutput": "{\"gmailLabelsCsv\":\"={{$env.GMAIL_LABELS || 'label1,label2,label3,Invoices,Receipts,Documents'}}\",\"spreadsheetId\":\"={{$env.GMAIL_SHEET_ID}}\",\"sheetName\":\"={{$env.GMAIL_SHEET_NAME || 'Email Log'}}\",\"driveRootFolderId\":\"={{$env.GMAIL_DRIVE_ROOT_FOLDER_ID}}\",\"lookbackWindow\":\"={{$env.GMAIL_LOOKBACK_WINDOW || '1d'}}\",\"timezone\":\"={{$env.WORKFLOW_TIMEZONE || 'Asia/Manila'}}\",\"dateFormat\":\"={{$env.DATE_FORMAT || 'YYYY-MM-DD'}}\"}"
       },
       "id": "55e72167-a130-437b-8428-7826d75e62d3",
       "name": "Config \u2014 Load Settings",
@@ -36,8 +36,7 @@
         260,
         0
       ],
-      "notes": "All environment-driven so the workflow never needs editing to add/remove a label, change the sheet, or change the Drive root folder.",
-      "notesInFlow": false
+      "notes": "All environment-driven so the workflow never needs editing to add/remove a label, change the sheet, or change the Drive root folder."
     },
     {
       "parameters": {

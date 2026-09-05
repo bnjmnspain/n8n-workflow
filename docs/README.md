@@ -45,11 +45,12 @@ API, Google Drive API v3, Telegram Bot API, Google Gemini API
   processing. Both workflows instead read the log sheet once per run, build
   an in-memory ID set, and check membership in a Code node. Cheaper and
   correct on the first-ever run (empty sheet) too.
-- **Drive "find-or-create folder" done in one Code node per level**, using
-  `httpRequestWithAuthentication` against the Drive REST API rather than a
-  Search node + IF + Create node chain. The native-node chain has the exact
-  same "0 results = branch never fires" problem as above. One node per
-  folder level is easier to read, test, and reuse.
+- **Drive "find-or-create folder" done with the native Google Drive node**
+  (`folder:create` + `folder:list`) plus a tiny Code node to pick the
+  existing-or-just-created id. We can't use a single `folder:create`
+  because Drive's API returns "folder already exists" instead of being
+  idempotent, and a Search-then-IF-then-Create chain has the same
+  "0 results = branch never fires" problem as the Sheets lookup above.
 - **Attachment upload is a sub-workflow**, called once per email via
   *Execute Workflow*. This keeps "loop over N attachments and come back with
   one result" cleanly scoped per email — no cross-email item mixing, and it's
@@ -115,22 +116,28 @@ Execute Workflow Trigger (receives messageId, label, sender, date, attachments[]
         ▼
 Code — sanitize label / date / sender folder names
         ▼
-Code — get-or-create "<Label>" folder          (Drive REST, search-then-create)
-        ▼
-Code — get-or-create "<YYYY-MM-DD>" folder      (parent = label folder)
-        ▼
-Code — get-or-create "<Sender Name>" folder     (parent = date folder)
-        ▼
-Split — one item per attachment (folder ids carried through)
-        ▼
-Gmail — download attachment (binary, original bytes)
-        ▼
-Drive — upload file (original filename + mimeType preserved)
-        ▼
-Aggregate — collect all uploaded file ids/links back into ONE item
-        ▼
-Code — carry email data + build { driveFileIds, driveFileLinks, uploadStatus }
+Drive — Create Label folder   ──▶   Drive — Lookup Label folder   ──▶   Code — Resolve Label Folder Id
+                                                                                  │
+Drive — Create Date folder    ──▶   Drive — Lookup Date folder    ──▶   Code — Resolve Date Folder Id
+                                                                                  │
+Drive — Create Sender folder  ──▶   Drive — Lookup Sender folder  ──▶   Code — Resolve Sender Folder Id
+                                                                                  ▼
+                                                                       Split — one item per attachment
+                                                                                  ▼
+                                                                       Gmail — download attachment
+                                                                                  ▼
+                                                                       Drive — upload (original filename)
+                                                                                  ▼
+                                                                       Aggregate — collect uploads
+                                                                                  ▼
+                                                                       Code — build final result
 ```
+
+Each folder level uses the native `googleDrive` node (with the Google Drive
+OAuth2 credential) for both `folder:create` and `folder:list`, then a tiny
+Code node picks the existing id or the just-created id and forwards it
+downstream. We can't use a single `folder:create` because Drive's create
+endpoint fails with "folder already exists" instead of being idempotent.
 
 Resulting Drive layout:
 
@@ -194,56 +201,110 @@ Receipt Photos/
 ## 3. Quick Start — Testing Locally
 
 Want to see the workflows run before wiring up real credentials? Here's the
-fastest path:
+fastest path on Windows.
 
-### 3a. Run n8n locally (30 seconds)
+### 3a. Run n8n locally (Windows, npm)
 
-**Option A — Docker (recommended):**
-```bash
-docker run -it --rm -p 5678:5678 -v ~/.n8n:/home/user/.n8n n8nio/n8n
+`npx n8n start` does **not** work on a fresh machine — newer npm blocks the
+`prebuild-install` script that downloads the `sqlite3` native binding, and
+n8n then crashes with `Initial database connection attempt … failed: SQLite
+package has not been found installed`. The fix is to install n8n into a
+project folder that allows the build script, then run it from there.
+
+```powershell
+# 1. Make a project folder just for n8n
+mkdir C:\n8n-install
+cd C:\n8n-install
+npm init -y
+
+# 2. Allow sqlite3's prebuild-install to actually run
+#    (npm 7+ blocks install scripts by default)
+npm config set fund false
+npm install --foreground-scripts sqlite3
+#    If npm still blocks the script, run this once:
+npm approve-scripts sqlite3
+npm rebuild sqlite3
+
+# 3. Install n8n into the same folder
+npm install n8n
+
+# 4. Start n8n. The first run takes ~30s while it migrates the DB.
+.\node_modules\.bin\n8n.cmd start
 ```
 
-**Option B — npm:**
-```bash
-npx n8n start
-```
+Once n8n is up, open `http://localhost:5678` and create the owner account.
 
-Open `http://localhost:5678` in a browser and create an admin account.
+> **Tip — keep n8n between sessions.** Add a PowerShell function to your
+> profile (`notepad $PROFILE`) so you can re-start with one command:
+>
+> ```powershell
+> function Start-N8n {
+>   & "C:\n8n-install\node_modules\.bin\n8n.cmd" start
+> }
+> ```
+>
+> After saving, `. $PROFILE` and then `Start-N8n`.
 
 ### 3b. Import the workflows
 
-1. **Workflow 1** — drag-and-drop `workflows/workflow-1-gmail-multilabel.json`,
-   then drag-and-drop `workflows/sub-workflow-upload-gmail-attachments.json`.
-   Open the "Run — Upload Gmail Attachments" node in Workflow 1 and select
-   "Sub — Upload Gmail Attachments" from the workflow dropdown. n8n assigns
-   internal IDs on import — the link must be made manually.
-2. **Workflow 2** — drag-and-drop `workflows/workflow-2-telegram-receipt-gemini.json`.
+In n8n: **Workflows → ⋮ → Import from File…** (or drag-and-drop the JSON
+files onto the canvas). Import **all three**:
 
-### 3c. Set environment variables
+1. `workflows/workflow-1-gmail-multilabel.json`
+2. `workflows/sub-workflow-upload-gmail-attachments.json`
+3. `workflows/workflow-2-telegram-receipt-gemini.json`
 
-Copy `docs/.env.example` to a `.env` file (or set them in n8n's
-**Settings → Environment Variables**). Only fill in values you have; the
-defaults are safe for local testing.
+After import, open **"Gmail Multi-Label → Sheets + Drive"** and
+double-click the **Run — Upload Gmail Attachments** node. In the **Workflow**
+dropdown, pick **"Sub — Upload Gmail Attachments"** — n8n assigns internal
+IDs at import time, so this link must be re-made manually.
 
-### 3d. Create credentials
+### 3c. Wire up the credential placeholders
 
-Use n8n's **Credentials** tab to create:
-- **Gmail OAuth2** (Google Cloud project → APIs & Services → OAuth consent screen +
-  OAuth 2.0 client ID with Gmail, Sheets, Drive scopes)
-- **Google Sheets OAuth2** (same Google Cloud project, Sheets API enabled)
-- **Google Drive OAuth2** (same project, Drive API enabled)
-- **Telegram** (talk to @BotFather, `/newbot`, paste the token)
+Each workflow JSON contains placeholder credential IDs in the form
+`"REPLACE_WITH_*_CREDENTIAL_ID"`. After import:
 
-### 3e. Run and inspect
+1. **Settings → Credentials → New** and create:
+   - **Gmail OAuth2** (Google Cloud project with Gmail API enabled)
+   - **Google Sheets OAuth2** (Sheets API enabled)
+   - **Google Drive OAuth2** (Drive API enabled)
+   - **Telegram** (token from `@BotFather` → `/newbot`)
+2. Open every node that shows a red "no credential" warning and pick the
+   matching credential from its dropdown. The fastest way is to search the
+   canvas for nodes with the red badge.
 
-- **Workflow 1:** click the workflow, enable it, then click **Test Workflow**
-  (the play button) or wait for the next Schedule Trigger fire. Watch the
-  execution log — each node shows its input/output. Check your Google Sheet
-  and Drive folder for results.
+> The placeholder values in the JSON are deliberate — they make it obvious
+> on import which nodes need a credential, instead of silently failing at
+> the first run.
+
+### 3d. Set environment variables
+
+**Settings → Environment Variables** and paste from `docs/.env.example`.
+Only fill in values you have; the defaults are safe for local testing. The
+ones without defaults are required:
+
+| Required | Default if unset |
+|---|---|
+| `GMAIL_SHEET_ID` | *(required)* |
+| `GMAIL_DRIVE_ROOT_FOLDER_ID` | *(required)* |
+| `RECEIPTS_SHEET_ID` | *(required)* |
+| `RECEIPTS_DRIVE_ROOT_FOLDER_ID` | *(required)* |
+| `GEMINI_API_KEY` | *(required)* |
+
+### 3e. Create the two Sheets tabs
+
+Use the column headers in `docs/google-sheets-templates.md`. Column names
+must match exactly — the Sheets nodes map by header.
+
+### 3f. Run and verify
+
+- **Workflow 1:** open the workflow → click **Test Workflow** (or wait for
+  the next Schedule Trigger fire). Watch the execution log, then check your
+  Google Sheet + Drive folder.
 - **Workflow 2:** send a photo to your Telegram bot in a private chat, then
-  check the **Executions** tab in n8n for the triggered run.
+  check the **Executions** tab in n8n.
 
-### 3f. How to verify it's working
+### 3g. How to verify it's working
 
 | Check | Where to look |
 |---|---|
@@ -255,35 +316,6 @@ Use n8n's **Credentials** tab to create:
 | Error path | Break a credential → check `Processing Status = Error` column |
 
 ---
-
-1. **Run n8n** — self-hosted (`npx n8n` / Docker) or n8n Cloud both work; nothing here is deployment-specific.
-2. **Create credentials** in n8n (Credentials → New):
-   - `Gmail OAuth2` — Google Cloud project with Gmail API enabled, scopes
-     `gmail.readonly` (and `gmail.modify` if you plan to auto-label/archive
-     later — not required for this build).
-   - `Google Sheets OAuth2` and `Google Drive OAuth2` — can reuse the same
-     Google Cloud OAuth client as Gmail; just enable the Sheets and Drive
-     APIs on that project too.
-   - `Telegram` — message **@BotFather** on Telegram, `/newbot`, copy the
-     token into the credential.
-   - **Gemini** — this build calls Gemini via a plain `HTTP Request` node
-     with an `x-goog-api-key` header (`GEMINI_API_KEY` env var) so the key
-     never sits inside workflow JSON. If your n8n version ships a native
-     Google Gemini/PaLM credential type, you can swap the HTTP node for that
-     credential instead — same request shape.
-3. **Import** both `workflow-1-gmail-multilabel.json` and
-   `sub-workflow-upload-gmail-attachments.json`, then open the
-   "Run — Upload Gmail Attachments" node in Workflow 1 and pick the sub-workflow
-   from the dropdown (n8n links them by internal ID, which only exists after
-   both are imported into the same instance).
-4. **Import** `workflow-2-telegram-receipt-gemini.json`.
-5. **Set environment variables** — see `CONFIGURATION.md` / `.env.example`.
-6. **Attach credentials** to each node (Gmail nodes → Gmail OAuth2, Sheets
-   nodes → Google Sheets OAuth2, Drive/Code nodes that call Drive →
-   Google Drive OAuth2, Telegram nodes → Telegram credential).
-7. **Create the two Sheets tabs** using the column headers in
-   `google-sheets-templates.md`.
-8. **Activate** both workflows.
 
 ## 4. Configuration
 

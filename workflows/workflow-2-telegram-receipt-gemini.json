@@ -15,6 +15,12 @@
         0,
         0
       ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram"
+        }
+      },
       "notes": "Fires on every message sent to the bot. Attach the Telegram Bot credential (TELEGRAM_BOT_TOKEN) after import.",
       "notesInFlow": false
     },
@@ -62,6 +68,12 @@
         520,
         -140
       ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram"
+        }
+      },
       "notes": "Handles the 'Message without a photo' / non-receipt-image test case.",
       "notesInFlow": false
     },
@@ -162,6 +174,12 @@
         1300,
         240
       ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram"
+        }
+      },
       "continueOnFail": true,
       "onError": "continueRegularOutput",
       "notes": "Takes the last (highest-resolution) entry in Telegram's photo size array. The Download node below uses the returned file_id (not file_path) because n8n's Telegram download operation resolves a file_id via getFile internally.",
@@ -182,6 +200,12 @@
         1560,
         240
       ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram"
+        }
+      },
       "continueOnFail": true,
       "onError": "continueRegularOutput"
     },
@@ -263,18 +287,72 @@
     },
     {
       "parameters": {
-        "jsCode": "const j = $json;\nconst rootId = $env.RECEIPTS_DRIVE_ROOT_FOLDER_ID;\nconst folderName = j.dateFolder;\n\nconst searchQuery = `name='${folderName}' and '${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;\n\nconst found = await this.helpers.httpRequestWithAuthentication.call(\n  this, 'googleDriveOAuth2Api',\n  { method: 'GET', url: 'https://www.googleapis.com/drive/v3/files',\n    qs: { q: searchQuery, fields: 'files(id,name)' }, json: true }\n);\n\nlet folderId;\nif (found.files && found.files.length > 0) {\n  folderId = found.files[0].id;\n} else {\n  const created = await this.helpers.httpRequestWithAuthentication.call(\n    this, 'googleDriveOAuth2Api',\n    { method: 'POST', url: 'https://www.googleapis.com/drive/v3/files',\n      body: { name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [rootId] },\n      json: true }\n  );\n  folderId = created.id;\n}\n\nreturn [{ json: { ...j, dateFolderId: folderId }, binary: $binary }];"
+        "resource": "folder",
+        "operation": "create",
+        "name": "={{$json.dateFolder}}",
+        "options": {
+          "parents": [
+            "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID}}"
+          ]
+        }
       },
       "id": "e6cc4fab-69e1-4c6d-acf5-20e169ddbd10",
-      "name": "Code \u2014 Get Or Create Date Folder",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 1,
+      "name": "Drive \u2014 Create Date Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
       "position": [
         2860,
         240
       ],
-      "notes": "Same find-or-create pattern as Workflow 1 \u2014 reuses the day's folder across every receipt submitted that day.",
-      "notesInFlow": false
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive OAuth2"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput",
+      "notes": "Native Google Drive node. 'Folder already exists' error is expected and swallowed by continueOnFail \u2014 the next node looks up the existing folder."
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "operation": "list",
+        "filter": {
+          "name": "={{$json.dateFolder}}",
+          "parents": [
+            "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID}}"
+          ]
+        },
+        "options": {}
+      },
+      "id": "e6cc4fab-69e1-4c6d-acf5-20e169ddbd10-lookup",
+      "name": "Drive \u2014 Lookup Date Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2860,
+        380
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const looked = $('Drive \u2014 Lookup Date Folder').first().json;\nconst created = $('Drive \u2014 Create Date Folder').first().json;\nconst carry = $('Code \u2014 Build Filename & Date Folder').first().json;\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) throw new Error('Could not resolve Date folder id');\nreturn [{ json: { ...carry, dateFolderId: folderId }, binary: $binary }];"
+      },
+      "id": "e6cc4fab-69e1-4c6d-acf5-20e169ddbd10-resolve",
+      "name": "Code \u2014 Resolve Date Folder Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        3120,
+        240
+      ]
     },
     {
       "parameters": {
@@ -299,7 +377,12 @@
       "continueOnFail": true,
       "onError": "continueRegularOutput",
       "notes": "Uploads the untouched original photo \u2014 never the AI-processed version.",
-      "notesInFlow": false
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive OAuth2"
+        }
+      }
     },
     {
       "parameters": {
@@ -374,6 +457,12 @@
         3900,
         240
       ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram"
+        }
+      },
       "continueOnFail": true,
       "onError": "continueRegularOutput"
     }
@@ -507,14 +596,36 @@
       "main": [
         [
           {
-            "node": "Code \u2014 Get Or Create Date Folder",
+            "node": "Drive \u2014 Create Date Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Get Or Create Date Folder": {
+    "Drive \u2014 Create Date Folder": {
+      "main": [
+        [
+          {
+            "node": "Drive \u2014 Lookup Date Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive \u2014 Lookup Date Folder": {
+      "main": [
+        [
+          {
+            "node": "Code \u2014 Resolve Date Folder Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code \u2014 Resolve Date Folder Id": {
       "main": [
         [
           {
