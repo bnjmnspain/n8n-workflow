@@ -1,5 +1,5 @@
 {
-  "name": "Telegram Receipt \u2192 Gemini \u2192 Sheets + Drive",
+  "name": "Telegram Receipt → Gemini → Sheets + Drive",
   "nodes": [
     {
       "parameters": {
@@ -8,37 +8,61 @@
         ]
       },
       "id": "19b11ead-d214-464c-ad4b-522d85a2a957",
-      "name": "Telegram \u2014 Receive Message",
+      "name": "Telegram — Receive Message",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
       "position": [
         0,
         0
       ],
-      "credentials": {
-        "telegramApi": {
-          "id": "",
-          "name": "Telegram"
-        }
-      },
       "notes": "Fires on every message sent to the bot. Attach the Telegram Bot credential (TELEGRAM_BOT_TOKEN) after import."
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "b1", "name": "receiptFieldsCsv", "value": "={{$env.RECEIPT_FIELDS || 'merchant_name,amount,currency,date,receipt_number,tax,subtotal,payment_method,confidence'}}", "type": "string" },
-            { "id": "b2", "name": "geminiModel", "value": "={{$env.GEMINI_MODEL || 'gemini-2.0-flash'}}", "type": "string" },
-            { "id": "b3", "name": "geminiApiKey", "value": "={{$env.GEMINI_API_KEY || ''}}", "type": "string" },
-            { "id": "b4", "name": "spreadsheetId", "value": "={{$env.RECEIPTS_SHEET_ID || ''}}", "type": "string" },
-            { "id": "b5", "name": "sheetName", "value": "={{$env.RECEIPTS_SHEET_NAME || 'Receipts'}}", "type": "string" },
-            { "id": "b6", "name": "driveRootFolderId", "value": "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID || ''}}", "type": "string" }
+            {
+              "id": "b1",
+              "name": "receiptFieldsCsv",
+              "value": "={{$env.RECEIPT_FIELDS || 'merchant_name,amount,currency,date,receipt_number,tax,subtotal,payment_method,confidence'}}",
+              "type": "string"
+            },
+            {
+              "id": "b2",
+              "name": "geminiModel",
+              "value": "={{$env.GEMINI_MODEL || 'gemini-2.0-flash'}}",
+              "type": "string"
+            },
+            {
+              "id": "b3",
+              "name": "geminiApiKey",
+              "value": "={{$env.GEMINI_API_KEY || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "b4",
+              "name": "spreadsheetId",
+              "value": "={{$env.RECEIPTS_SHEET_ID || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "b5",
+              "name": "sheetName",
+              "value": "={{$env.RECEIPTS_SHEET_NAME || 'Receipts'}}",
+              "type": "string"
+            },
+            {
+              "id": "b6",
+              "name": "driveRootFolderId",
+              "value": "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID || ''}}",
+              "type": "string"
+            }
           ]
         },
         "options": {}
       },
       "id": "c0f1aaaa-0001-4000-8000-000000000001",
-      "name": "Config \u2014 Load Settings",
+      "name": "Config — Load Settings",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
@@ -68,7 +92,7 @@
         }
       },
       "id": "f99b6678-4bf9-4d3c-802a-a0f25121363a",
-      "name": "Check \u2014 Is Photo?",
+      "name": "Check — Is Photo?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -81,22 +105,16 @@
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "={{$json.message.chat.id}}",
-        "text": "I can only process receipt photos right now \u2014 please send a clear picture of your receipt."
+        "text": "I can only process receipt photos right now — please send a clear picture of your receipt."
       },
       "id": "573c6d32-b84e-4325-a677-3f4e77e6acd8",
-      "name": "Telegram \u2014 Reject Non-Photo",
+      "name": "Telegram — Reject Non-Photo",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
         520,
         -140
       ],
-      "credentials": {
-        "telegramApi": {
-          "id": "",
-          "name": "Telegram"
-        }
-      },
       "notes": "Handles the 'Message without a photo' / non-receipt-image test case.",
       "notesInFlow": false
     },
@@ -118,7 +136,7 @@
         }
       },
       "id": "14c82830-7aae-4045-a909-b8a6fb4bccea",
-      "name": "Sheets \u2014 Read Existing Receipt IDs",
+      "name": "Sheets — Read Existing Receipt IDs",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
@@ -127,16 +145,16 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Read once per incoming photo and compared in-memory, same reasoning as Workflow 1 \u2014 avoids the 'lookup returns 0 rows so nothing runs' trap.",
+      "notes": "Read once per incoming photo and compared in-memory, same reasoning as Workflow 1 — avoids the 'lookup returns 0 rows so nothing runs' trap.",
       "notesInFlow": false
     },
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const trigger = $('Telegram \u2014 Receive Message').first().json;\nconst chatId = trigger.message.chat.id;\nconst messageId = trigger.message.message_id;\nconst dedupKey = `${chatId}:${messageId}`;\n\nconst rows = $input.all();\nconst existingKeys = new Set(\n  rows.map(r => `${r.json['Chat ID']}:${r.json['Telegram Message ID']}`)\n);\n\nreturn [{\n  json: {\n    chatId,\n    telegramMessageId: messageId,\n    dedupKey,\n    isDuplicate: existingKeys.has(dedupKey),\n    photoSizes: trigger.message.photo,\n    document: trigger.message.document || null,\n  }\n}];"
+        "jsCode": "const trigger = $('Telegram — Receive Message').first().json;\nconst chatId = trigger.message.chat.id;\nconst messageId = trigger.message.message_id;\nconst dedupKey = `${chatId}:${messageId}`;\n\nconst rows = $input.all();\nconst existingKeys = new Set(\n  rows.map(r => `${r.json['Chat ID']}:${r.json['Telegram Message ID']}`)\n);\n\nreturn [{\n  json: {\n    chatId,\n    telegramMessageId: messageId,\n    dedupKey,\n    isDuplicate: existingKeys.has(dedupKey),\n    photoSizes: trigger.message.photo,\n    document: trigger.message.document || null,\n  }\n}];"
       },
       "id": "85859ba1-b786-4fc7-8d4c-e6364b3ffa1d",
-      "name": "Code \u2014 Check Duplicate",
+      "name": "Code — Check Duplicate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -165,7 +183,7 @@
         }
       },
       "id": "da7ec15a-77e6-44d7-92d6-e9e4b0cfe2d0",
-      "name": "Check \u2014 Already Processed?",
+      "name": "Check — Already Processed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -176,7 +194,7 @@
     {
       "parameters": {},
       "id": "d1dc67a8-e2ef-409d-8502-3e2b288170e0",
-      "name": "Skip \u2014 Duplicate Message",
+      "name": "Skip — Duplicate Message",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
@@ -190,19 +208,13 @@
         "fileId": "={{$json.photoSizes[$json.photoSizes.length - 1].file_id}}"
       },
       "id": "61e4ff4a-15d3-44b6-8e2c-9a767af6eeef",
-      "name": "Telegram \u2014 Get File Info",
+      "name": "Telegram — Get File Info",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
         1300,
         240
       ],
-      "credentials": {
-        "telegramApi": {
-          "id": "",
-          "name": "Telegram"
-        }
-      },
       "continueOnFail": true,
       "onError": "continueRegularOutput",
       "notes": "Takes the last (highest-resolution) entry in Telegram's photo size array. The Download node below uses the returned file_id (not file_path) because n8n's Telegram download operation resolves a file_id via getFile internally.",
@@ -216,28 +228,22 @@
         "binaryPropertyName": "data"
       },
       "id": "18e96442-1af5-41e0-b953-b41e5134ecd3",
-      "name": "Telegram \u2014 Download Photo",
+      "name": "Telegram — Download Photo",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
         1560,
         240
       ],
-      "credentials": {
-        "telegramApi": {
-          "id": "",
-          "name": "Telegram"
-        }
-      },
       "continueOnFail": true,
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const binary = $binary.data;\nconst base64 = binary.data; // n8n stores binary as base64 already\nconst mimeType = binary.mimeType || 'image/jpeg';\n\n// Read config from the upstream Set node, not $env (which is blocked in restricted Code nodes).\nconst cfg = ($('Config \u2014 Load Settings').first() && $('Config \u2014 Load Settings').first().json) || {};\nconst fields = String(cfg.receiptFieldsCsv ||\n  'merchant_name,amount,currency,date,receipt_number,tax,subtotal,payment_method,confidence'\n).split(',').map(f => f.trim());\n\nconst prompt = `You are extracting structured data from a photo of a retail receipt.\\n`\n  + `Return ONLY a single JSON object (no markdown fences, no commentary) with exactly these fields: ${fields.join(', ')}.\\n`\n  + `- amount, tax and subtotal must be numbers (no currency symbols).\\n`\n  + `- date must be ISO format YYYY-MM-DD if legible, otherwise null.\\n`\n  + `- confidence is your own 0-1 estimate of extraction reliability.\\n`\n  + `- Use null for any field you cannot read.`;\n\nreturn [{\n  json: { ...$json, geminiPrompt: prompt, base64Image: base64, mimeType, geminiModel: cfg.geminiModel, geminiApiKey: cfg.geminiApiKey },\n  binary: $binary,\n}];"
+        "jsCode": "const binary = $binary.data;\nconst base64 = binary.data; // n8n stores binary as base64 already\nconst mimeType = binary.mimeType || 'image/jpeg';\n\n// Read config from the upstream Set node, not $env (which is blocked in restricted Code nodes).\nconst cfg = ($('Config — Load Settings').first() && $('Config — Load Settings').first().json) || {};\nconst fields = String(cfg.receiptFieldsCsv ||\n  'merchant_name,amount,currency,date,receipt_number,tax,subtotal,payment_method,confidence'\n).split(',').map(f => f.trim());\n\nconst prompt = `You are extracting structured data from a photo of a retail receipt.\\n`\n  + `Return ONLY a single JSON object (no markdown fences, no commentary) with exactly these fields: ${fields.join(', ')}.\\n`\n  + `- amount, tax and subtotal must be numbers (no currency symbols).\\n`\n  + `- date must be ISO format YYYY-MM-DD if legible, otherwise null.\\n`\n  + `- confidence is your own 0-1 estimate of extraction reliability.\\n`\n  + `- Use null for any field you cannot read.`;\n\nreturn [{\n  json: { ...$json, geminiPrompt: prompt, base64Image: base64, mimeType, geminiModel: cfg.geminiModel, geminiApiKey: cfg.geminiApiKey },\n  binary: $binary,\n}];"
       },
       "id": "927ef183-bdf8-4e5e-aec6-0c627b9b680d",
-      "name": "Code \u2014 Prepare Gemini Request",
+      "name": "Code — Prepare Gemini Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -266,7 +272,7 @@
         }
       },
       "id": "dc9d8a19-258b-448f-8b47-f72dc585b8e0",
-      "name": "Gemini \u2014 Extract Receipt Data",
+      "name": "Gemini — Extract Receipt Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -280,17 +286,17 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json;\nconst upstream = $('Code \u2014 Prepare Gemini Request').first().json;\nlet status = 'Success';\nlet errorMessage = '';\nlet parsed = {};\n\ntry {\n  const text = raw.candidates?.[0]?.content?.parts?.[0]?.text;\n  if (!text) throw new Error('No text returned from Gemini');\n  const cleaned = text.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  status = 'Error';\n  errorMessage = 'Gemini extraction failed: ' + e.message;\n}\n\nconst num = (v) => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);\n\nif (status === 'Success' && (parsed.merchant_name == null || num(parsed.amount) == null)) {\n  status = 'Error';\n  errorMessage = errorMessage || 'Missing required field (merchant_name or amount)';\n}\n\nreturn [{\n  json: {\n    chatId: upstream.chatId,\n    telegramMessageId: upstream.telegramMessageId,\n    merchantName: parsed.merchant_name || null,\n    amount: num(parsed.amount),\n    currency: parsed.currency || null,\n    receiptDate: parsed.date || null,\n    receiptNumber: parsed.receipt_number || null,\n    subtotal: num(parsed.subtotal),\n    tax: num(parsed.tax),\n    paymentMethod: parsed.payment_method || null,\n    confidence: num(parsed.confidence),\n    extractionStatus: status,\n    errorMessage,\n  },\n  binary: $binary,\n}];"
+        "jsCode": "const raw = $json;\nconst upstream = $('Code — Prepare Gemini Request').first().json;\nlet status = 'Success';\nlet errorMessage = '';\nlet parsed = {};\n\ntry {\n  const text = raw.candidates?.[0]?.content?.parts?.[0]?.text;\n  if (!text) throw new Error('No text returned from Gemini');\n  const cleaned = text.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  status = 'Error';\n  errorMessage = 'Gemini extraction failed: ' + e.message;\n}\n\nconst num = (v) => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);\n\nif (status === 'Success' && (parsed.merchant_name == null || num(parsed.amount) == null)) {\n  status = 'Error';\n  errorMessage = errorMessage || 'Missing required field (merchant_name or amount)';\n}\n\nreturn [{\n  json: {\n    chatId: upstream.chatId,\n    telegramMessageId: upstream.telegramMessageId,\n    merchantName: parsed.merchant_name || null,\n    amount: num(parsed.amount),\n    currency: parsed.currency || null,\n    receiptDate: parsed.date || null,\n    receiptNumber: parsed.receipt_number || null,\n    subtotal: num(parsed.subtotal),\n    tax: num(parsed.tax),\n    paymentMethod: parsed.payment_method || null,\n    confidence: num(parsed.confidence),\n    extractionStatus: status,\n    errorMessage,\n  },\n  binary: $binary,\n}];"
       },
       "id": "6519a385-6077-470c-a70b-854990c33bf1",
-      "name": "Code \u2014 Validate Gemini Response",
+      "name": "Code — Validate Gemini Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
         2340,
         240
       ],
-      "notes": "Handles malformed/incomplete responses gracefully \u2014 a bad response still produces one clean row with Processing Status = Error instead of crashing the workflow.",
+      "notes": "Handles malformed/incomplete responses gracefully — a bad response still produces one clean row with Processing Status = Error instead of crashing the workflow.",
       "notesInFlow": false
     },
     {
@@ -298,7 +304,7 @@
         "jsCode": "const j = $json;\nconst now = new Date();\nconst dateFolder = now.toISOString().slice(0, 10);\n\nconst originalName = ($binary && $binary.data && $binary.data.fileName) || null;\nconst ext = (originalName && originalName.includes('.'))\n  ? originalName.split('.').pop()\n  : (($binary.data.mimeType || '').split('/')[1] || 'jpg');\n\nconst pad = (n) => String(n).padStart(2, '0');\nconst stamp = `${dateFolder}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;\nconst fileName = originalName || `receipt_${stamp}.${ext}`;\n\nreturn [{ json: { ...j, dateFolder, fileName }, binary: $binary }];"
       },
       "id": "f9533e06-a7f4-49b6-a97f-f9d7c60b82e3",
-      "name": "Code \u2014 Build Filename & Date Folder",
+      "name": "Code — Build Filename & Date Folder",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -320,22 +326,16 @@
         }
       },
       "id": "e6cc4fab-69e1-4c6d-acf5-20e169ddbd10",
-      "name": "Drive \u2014 Create Date Folder",
+      "name": "Drive — Create Date Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         2860,
         240
       ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      },
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Native Google Drive node. 'Folder already exists' error is expected and swallowed by continueOnFail \u2014 the next node looks up the existing folder."
+      "notes": "Native Google Drive node. 'Folder already exists' error is expected and swallowed by continueOnFail — the next node looks up the existing folder."
     },
     {
       "parameters": {
@@ -350,26 +350,20 @@
         "options": {}
       },
       "id": "e6cc4fab-69e1-4c6d-acf5-20e169ddbd10-lookup",
-      "name": "Drive \u2014 Lookup Date Folder",
+      "name": "Drive — Lookup Date Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         2860,
         380
-      ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      }
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const looked = $('Drive \u2014 Lookup Date Folder').first().json;\nconst created = $('Drive \u2014 Create Date Folder').first().json;\nconst carry = $('Code \u2014 Build Filename & Date Folder').first().json;\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) throw new Error('Could not resolve Date folder id');\nreturn [{ json: { ...carry, dateFolderId: folderId }, binary: $binary }];"
+        "jsCode": "const looked = $('Drive — Lookup Date Folder').first().json;\nconst created = $('Drive — Create Date Folder').first().json;\nconst carry = $('Code — Build Filename & Date Folder').first().json;\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) throw new Error('Could not resolve Date folder id');\nreturn [{ json: { ...carry, dateFolderId: folderId }, binary: $binary }];"
       },
       "id": "e6cc4fab-69e1-4c6d-acf5-20e169ddbd10-resolve",
-      "name": "Code \u2014 Resolve Date Folder Id",
+      "name": "Code — Resolve Date Folder Id",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -390,7 +384,7 @@
         "binaryPropertyName": "data"
       },
       "id": "0f043a5f-ccab-42f3-8edc-1d0820a9a0ba",
-      "name": "Drive \u2014 Upload Receipt Photo",
+      "name": "Drive — Upload Receipt Photo",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
@@ -399,20 +393,14 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Uploads the untouched original photo \u2014 never the AI-processed version.",
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      }
+      "notes": "Uploads the untouched original photo — never the AI-processed version."
     },
     {
       "parameters": {
         "jsCode": "const j = $json;\nconst driveUploadFailed = !!j.error;\nreturn [{\n  json: {\n    ...j,\n    driveFileId: driveUploadFailed ? '' : (j.id || ''),\n    processingStatus: (j.extractionStatus === 'Error' || driveUploadFailed) ? 'Error' : 'Success',\n    processedAt: new Date().toISOString(),\n  }\n}];"
       },
       "id": "97e9e109-1324-4bb5-adf3-5133f62f28cd",
-      "name": "Code \u2014 Merge Final Row",
+      "name": "Code — Merge Final Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -455,7 +443,7 @@
         }
       },
       "id": "9255acca-9600-401c-8d78-5722547503f1",
-      "name": "Sheets \u2014 Append Receipt Row",
+      "name": "Sheets — Append Receipt Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
@@ -470,233 +458,227 @@
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "={{$json.chatId}}",
-        "text": "={{$json.processingStatus === 'Success' \n  ? `Got it! ${$json.merchantName} \u2014 ${$json.currency || ''} ${$json.amount}`.trim()\n  : 'I saved your photo but couldn\\'t read the receipt clearly \u2014 you can try a clearer photo.'}}"
+        "text": "={{$json.processingStatus === 'Success' \n  ? `Got it! ${$json.merchantName} — ${$json.currency || ''} ${$json.amount}`.trim()\n  : 'I saved your photo but couldn\\'t read the receipt clearly — you can try a clearer photo.'}}"
       },
       "id": "cbfffd9f-b445-48b3-b923-e00ee309bdb8",
-      "name": "Telegram \u2014 Send Confirmation",
+      "name": "Telegram — Send Confirmation",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
         3900,
         240
       ],
-      "credentials": {
-        "telegramApi": {
-          "id": "",
-          "name": "Telegram"
-        }
-      },
       "continueOnFail": true,
       "onError": "continueRegularOutput"
     }
   ],
   "connections": {
-    "Telegram \u2014 Receive Message": {
+    "Telegram — Receive Message": {
       "main": [
         [
           {
-            "node": "Config \u2014 Load Settings",
+            "node": "Config — Load Settings",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Config \u2014 Load Settings": {
+    "Config — Load Settings": {
       "main": [
         [
           {
-            "node": "Check \u2014 Is Photo?",
+            "node": "Check — Is Photo?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check \u2014 Is Photo?": {
+    "Check — Is Photo?": {
       "main": [
         [
           {
-            "node": "Sheets \u2014 Read Existing Receipt IDs",
+            "node": "Sheets — Read Existing Receipt IDs",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Telegram \u2014 Reject Non-Photo",
+            "node": "Telegram — Reject Non-Photo",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Sheets \u2014 Read Existing Receipt IDs": {
+    "Sheets — Read Existing Receipt IDs": {
       "main": [
         [
           {
-            "node": "Code \u2014 Check Duplicate",
+            "node": "Code — Check Duplicate",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Check Duplicate": {
+    "Code — Check Duplicate": {
       "main": [
         [
           {
-            "node": "Check \u2014 Already Processed?",
+            "node": "Check — Already Processed?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check \u2014 Already Processed?": {
+    "Check — Already Processed?": {
       "main": [
         [
           {
-            "node": "Skip \u2014 Duplicate Message",
+            "node": "Skip — Duplicate Message",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Telegram \u2014 Get File Info",
+            "node": "Telegram — Get File Info",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Telegram \u2014 Get File Info": {
+    "Telegram — Get File Info": {
       "main": [
         [
           {
-            "node": "Telegram \u2014 Download Photo",
+            "node": "Telegram — Download Photo",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Telegram \u2014 Download Photo": {
+    "Telegram — Download Photo": {
       "main": [
         [
           {
-            "node": "Code \u2014 Prepare Gemini Request",
+            "node": "Code — Prepare Gemini Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Prepare Gemini Request": {
+    "Code — Prepare Gemini Request": {
       "main": [
         [
           {
-            "node": "Gemini \u2014 Extract Receipt Data",
+            "node": "Gemini — Extract Receipt Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gemini \u2014 Extract Receipt Data": {
+    "Gemini — Extract Receipt Data": {
       "main": [
         [
           {
-            "node": "Code \u2014 Validate Gemini Response",
+            "node": "Code — Validate Gemini Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Validate Gemini Response": {
+    "Code — Validate Gemini Response": {
       "main": [
         [
           {
-            "node": "Code \u2014 Build Filename & Date Folder",
+            "node": "Code — Build Filename & Date Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Build Filename & Date Folder": {
+    "Code — Build Filename & Date Folder": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Create Date Folder",
+            "node": "Drive — Create Date Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Create Date Folder": {
+    "Drive — Create Date Folder": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Lookup Date Folder",
+            "node": "Drive — Lookup Date Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Lookup Date Folder": {
+    "Drive — Lookup Date Folder": {
       "main": [
         [
           {
-            "node": "Code \u2014 Resolve Date Folder Id",
+            "node": "Code — Resolve Date Folder Id",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Resolve Date Folder Id": {
+    "Code — Resolve Date Folder Id": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Upload Receipt Photo",
+            "node": "Drive — Upload Receipt Photo",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Upload Receipt Photo": {
+    "Drive — Upload Receipt Photo": {
       "main": [
         [
           {
-            "node": "Code \u2014 Merge Final Row",
+            "node": "Code — Merge Final Row",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Merge Final Row": {
+    "Code — Merge Final Row": {
       "main": [
         [
           {
-            "node": "Sheets \u2014 Append Receipt Row",
+            "node": "Sheets — Append Receipt Row",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Sheets \u2014 Append Receipt Row": {
+    "Sheets — Append Receipt Row": {
       "main": [
         [
           {
-            "node": "Telegram \u2014 Send Confirmation",
+            "node": "Telegram — Send Confirmation",
             "type": "main",
             "index": 0
           }

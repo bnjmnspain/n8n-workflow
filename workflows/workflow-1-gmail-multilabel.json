@@ -81,7 +81,7 @@
         260,
         0
       ],
-      "notes": "All environment-driven so the workflow never needs editing to add/remove a label, change the sheet, or change the Drive root folder."
+      "notes": "Reads env vars. If your n8n instance has N8N_BLOCK_ENV_ACCESS_IN_NODE=true, start n8n with N8N_BLOCK_ENV_ACCESS_IN_NODE=false to allow this node to read env vars (see README)."
     },
     {
       "parameters": {

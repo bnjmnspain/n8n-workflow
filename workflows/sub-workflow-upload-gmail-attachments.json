@@ -1,12 +1,12 @@
 {
-  "name": "Sub \u2014 Upload Gmail Attachments",
+  "name": "Sub — Upload Gmail Attachments",
   "nodes": [
     {
       "parameters": {
         "inputSource": "passthrough"
       },
       "id": "bca58d4f-5f0c-4963-9ee2-631109fa12e3",
-      "name": "Trigger \u2014 Receive Email Data",
+      "name": "Trigger — Receive Email Data",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
       "position": [
@@ -20,7 +20,7 @@
         "jsCode": "// Folder names must not contain characters Drive/other tools choke on.\nfunction sanitize(name) {\n  return String(name || 'Unknown')\n    .replace(/[\\\\/:*?\"<>|]/g, '-')\n    .replace(/\\s+/g, ' ')\n    .trim()\n    .slice(0, 100) || 'Unknown';\n}\nconst j = $json;\nreturn [{\n  json: {\n    ...j,\n    labelFolderName: sanitize(j.label),\n    dateFolderName: sanitize(j.receivedDateFolder),\n    senderFolderName: sanitize(j.senderName),\n  }\n}];"
       },
       "id": "e4f8c1ac-71d2-4f46-90a6-e1da7041d39e",
-      "name": "Code \u2014 Sanitize Folder Names",
+      "name": "Code — Sanitize Folder Names",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -40,22 +40,16 @@
         }
       },
       "id": "2133fe57-1946-4910-8041-6212add386f9",
-      "name": "Drive \u2014 Create Label Folder",
+      "name": "Drive — Create Label Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         520,
         0
       ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      },
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Native Google Drive node with OAuth2 credential. Continue-on-fail is on so a 'folder already exists' error doesn't halt the run \u2014 we then look it up in the next node."
+      "notes": "Native Google Drive node with OAuth2 credential. Continue-on-fail is on so a 'folder already exists' error doesn't halt the run — we then look it up in the next node."
     },
     {
       "parameters": {
@@ -70,27 +64,21 @@
         "options": {}
       },
       "id": "5a01f4cb-0001-4000-8000-000000000001",
-      "name": "Drive \u2014 Lookup Label Folder",
+      "name": "Drive — Lookup Label Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         780,
         0
       ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      },
-      "notes": "Search by exact name + parent. Returns the existing folder, OR a fresh empty list if the create just succeeded (Drive search index is eventually-consistent \u2014 in that case the Code node falls back to the create node's output)."
+      "notes": "Search by exact name + parent. Returns the existing folder, OR a fresh empty list if the create just succeeded (Drive search index is eventually-consistent — in that case the Code node falls back to the create node's output)."
     },
     {
       "parameters": {
-        "jsCode": "// Prefer the lookup result. If the lookup is empty, fall back to the create node's output\n// (Drive search index is eventually consistent \u2014 a just-created folder may not appear yet).\nconst looked = $('Drive \u2014 Lookup Label Folder').first().json;\nconst created = $('Drive \u2014 Create Label Folder').first().json;\nconst carry = $('Code \u2014 Sanitize Folder Names').first().json;\n\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) {\n  throw new Error('Could not resolve Label folder id');\n}\nreturn [{ json: { ...carry, labelFolderId: folderId } }];"
+        "jsCode": "// Prefer the lookup result. If the lookup is empty, fall back to the create node's output\n// (Drive search index is eventually consistent — a just-created folder may not appear yet).\nconst looked = $('Drive — Lookup Label Folder').first().json;\nconst created = $('Drive — Create Label Folder').first().json;\nconst carry = $('Code — Sanitize Folder Names').first().json;\n\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) {\n  throw new Error('Could not resolve Label folder id');\n}\nreturn [{ json: { ...carry, labelFolderId: folderId } }];"
       },
       "id": "5a01f4cb-0001-4000-8000-000000000002",
-      "name": "Code \u2014 Resolve Label Folder Id",
+      "name": "Code — Resolve Label Folder Id",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -110,19 +98,13 @@
         }
       },
       "id": "c05d437e-ff41-4f6f-96a6-b1c707441b14",
-      "name": "Drive \u2014 Create Date Folder",
+      "name": "Drive — Create Date Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         1300,
         0
       ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      },
       "continueOnFail": true,
       "onError": "continueRegularOutput"
     },
@@ -139,26 +121,20 @@
         "options": {}
       },
       "id": "5a01f4cb-0001-4000-8000-000000000003",
-      "name": "Drive \u2014 Lookup Date Folder",
+      "name": "Drive — Lookup Date Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         1560,
         0
-      ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      }
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const looked = $('Drive \u2014 Lookup Date Folder').first().json;\nconst created = $('Drive \u2014 Create Date Folder').first().json;\nconst carry = $('Code \u2014 Resolve Label Folder Id').first().json;\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) throw new Error('Could not resolve Date folder id');\nreturn [{ json: { ...carry, dateFolderId: folderId } }];"
+        "jsCode": "const looked = $('Drive — Lookup Date Folder').first().json;\nconst created = $('Drive — Create Date Folder').first().json;\nconst carry = $('Code — Resolve Label Folder Id').first().json;\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) throw new Error('Could not resolve Date folder id');\nreturn [{ json: { ...carry, dateFolderId: folderId } }];"
       },
       "id": "5a01f4cb-0001-4000-8000-000000000004",
-      "name": "Code \u2014 Resolve Date Folder Id",
+      "name": "Code — Resolve Date Folder Id",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -178,19 +154,13 @@
         }
       },
       "id": "f52f0733-c6b9-402b-87cc-521e6c92f3e8",
-      "name": "Drive \u2014 Create Sender Folder",
+      "name": "Drive — Create Sender Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         2080,
         0
       ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      },
       "continueOnFail": true,
       "onError": "continueRegularOutput"
     },
@@ -207,26 +177,20 @@
         "options": {}
       },
       "id": "5a01f4cb-0001-4000-8000-000000000005",
-      "name": "Drive \u2014 Lookup Sender Folder",
+      "name": "Drive — Lookup Sender Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
         2340,
         0
-      ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      }
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const looked = $('Drive \u2014 Lookup Sender Folder').first().json;\nconst created = $('Drive \u2014 Create Sender Folder').first().json;\nconst carry = $('Code \u2014 Resolve Date Folder Id').first().json;\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) throw new Error('Could not resolve Sender folder id');\nreturn [{ json: { ...carry, senderFolderId: folderId } }];"
+        "jsCode": "const looked = $('Drive — Lookup Sender Folder').first().json;\nconst created = $('Drive — Create Sender Folder').first().json;\nconst carry = $('Code — Resolve Date Folder Id').first().json;\nconst folderId = (looked && looked.id) || (created && created.id) || '';\nif (!folderId) throw new Error('Could not resolve Sender folder id');\nreturn [{ json: { ...carry, senderFolderId: folderId } }];"
       },
       "id": "5a01f4cb-0001-4000-8000-000000000006",
-      "name": "Code \u2014 Resolve Sender Folder Id",
+      "name": "Code — Resolve Sender Folder Id",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -242,7 +206,7 @@
         }
       },
       "id": "7530bdab-e4eb-4282-a18b-3cf879ee3fdb",
-      "name": "Split \u2014 Each Attachment",
+      "name": "Split — Each Attachment",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [
@@ -262,7 +226,7 @@
         }
       },
       "id": "60b5c074-92b8-49b2-85a9-e2d5c1002da3",
-      "name": "Gmail \u2014 Download Attachment",
+      "name": "Gmail — Download Attachment",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
@@ -271,13 +235,7 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Preserves the raw attachment bytes as binary data 'data'.",
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "",
-          "name": "Gmail OAuth2"
-        }
-      }
+      "notes": "Preserves the raw attachment bytes as binary data 'data'."
     },
     {
       "parameters": {
@@ -292,7 +250,7 @@
         "binaryPropertyName": "data"
       },
       "id": "396454fc-98c2-4dab-bc8a-ecd73324dfa8",
-      "name": "Drive \u2014 Upload Attachment",
+      "name": "Drive — Upload Attachment",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
@@ -301,13 +259,7 @@
       ],
       "continueOnFail": true,
       "onError": "continueRegularOutput",
-      "notes": "Filename comes straight from the original Gmail attachment metadata \u2014 never renamed.",
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "",
-          "name": "Google Drive OAuth2"
-        }
-      }
+      "notes": "Filename comes straight from the original Gmail attachment metadata — never renamed."
     },
     {
       "parameters": {
@@ -315,7 +267,7 @@
         "destinationFieldName": "uploads"
       },
       "id": "de83f429-8e94-4afe-af3a-c9f412520a73",
-      "name": "Aggregate \u2014 Collect Uploaded Files",
+      "name": "Aggregate — Collect Uploaded Files",
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
       "position": [
@@ -330,7 +282,7 @@
         "jsCode": "// Collect every upload result, then carry the original email data\n// back to the parent workflow so it can be logged in Sheets.\nconst input = $input.first().json;\nconst uploads = input.uploads || [];\nconst driveFileIds = uploads.map(u => u.json && u.json.id).filter(Boolean);\nconst driveFileLinks = uploads.map(u => u.json && u.json.webViewLink).filter(Boolean);\nconst anyFailed = uploads.some(u => u.json && u.json.error);\n\nconst emailMeta = (uploads[0] && uploads[0].json) || input;\n\nreturn [{\n  json: {\n    ...emailMeta,\n    driveFileIds,\n    driveFileLinks,\n    uploadedCount: driveFileIds.length,\n    uploadStatus: anyFailed ? 'error' : 'ok',\n  }\n}];"
       },
       "id": "77592630-f7a8-44db-a973-8b3f1035ec0a",
-      "name": "Code \u2014 Build Final Result",
+      "name": "Code — Build Final Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
@@ -340,165 +292,165 @@
     }
   ],
   "connections": {
-    "Trigger \u2014 Receive Email Data": {
+    "Trigger — Receive Email Data": {
       "main": [
         [
           {
-            "node": "Code \u2014 Sanitize Folder Names",
+            "node": "Code — Sanitize Folder Names",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Sanitize Folder Names": {
+    "Code — Sanitize Folder Names": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Create Label Folder",
+            "node": "Drive — Create Label Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Create Label Folder": {
+    "Drive — Create Label Folder": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Lookup Label Folder",
+            "node": "Drive — Lookup Label Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Lookup Label Folder": {
+    "Drive — Lookup Label Folder": {
       "main": [
         [
           {
-            "node": "Code \u2014 Resolve Label Folder Id",
+            "node": "Code — Resolve Label Folder Id",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Resolve Label Folder Id": {
+    "Code — Resolve Label Folder Id": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Create Date Folder",
+            "node": "Drive — Create Date Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Create Date Folder": {
+    "Drive — Create Date Folder": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Lookup Date Folder",
+            "node": "Drive — Lookup Date Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Lookup Date Folder": {
+    "Drive — Lookup Date Folder": {
       "main": [
         [
           {
-            "node": "Code \u2014 Resolve Date Folder Id",
+            "node": "Code — Resolve Date Folder Id",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Resolve Date Folder Id": {
+    "Code — Resolve Date Folder Id": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Create Sender Folder",
+            "node": "Drive — Create Sender Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Create Sender Folder": {
+    "Drive — Create Sender Folder": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Lookup Sender Folder",
+            "node": "Drive — Lookup Sender Folder",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Lookup Sender Folder": {
+    "Drive — Lookup Sender Folder": {
       "main": [
         [
           {
-            "node": "Code \u2014 Resolve Sender Folder Id",
+            "node": "Code — Resolve Sender Folder Id",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code \u2014 Resolve Sender Folder Id": {
+    "Code — Resolve Sender Folder Id": {
       "main": [
         [
           {
-            "node": "Split \u2014 Each Attachment",
+            "node": "Split — Each Attachment",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Split \u2014 Each Attachment": {
+    "Split — Each Attachment": {
       "main": [
         [
           {
-            "node": "Gmail \u2014 Download Attachment",
+            "node": "Gmail — Download Attachment",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gmail \u2014 Download Attachment": {
+    "Gmail — Download Attachment": {
       "main": [
         [
           {
-            "node": "Drive \u2014 Upload Attachment",
+            "node": "Drive — Upload Attachment",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Drive \u2014 Upload Attachment": {
+    "Drive — Upload Attachment": {
       "main": [
         [
           {
-            "node": "Aggregate \u2014 Collect Uploaded Files",
+            "node": "Aggregate — Collect Uploaded Files",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Aggregate \u2014 Collect Uploaded Files": {
+    "Aggregate — Collect Uploaded Files": {
       "main": [
         [
           {
-            "node": "Code \u2014 Build Final Result",
+            "node": "Code — Build Final Result",
             "type": "main",
             "index": 0
           }
