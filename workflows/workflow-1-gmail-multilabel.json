@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "Gmail Multi-Label \u2192 Sheets + Drive",
   "nodes": [
     {
@@ -25,13 +25,58 @@
     },
     {
       "parameters": {
-        "mode": "raw",
-        "jsonOutput": "{\"gmailLabelsCsv\":\"={{$env.GMAIL_LABELS || 'label1,label2,label3,Invoices,Receipts,Documents'}}\",\"spreadsheetId\":\"={{$env.GMAIL_SHEET_ID}}\",\"sheetName\":\"={{$env.GMAIL_SHEET_NAME || 'Email Log'}}\",\"driveRootFolderId\":\"={{$env.GMAIL_DRIVE_ROOT_FOLDER_ID}}\",\"lookbackWindow\":\"={{$env.GMAIL_LOOKBACK_WINDOW || '1d'}}\",\"timezone\":\"={{$env.WORKFLOW_TIMEZONE || 'Asia/Manila'}}\",\"dateFormat\":\"={{$env.DATE_FORMAT || 'YYYY-MM-DD'}}\"}"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "gmailLabelsCsv",
+              "value": "={{$env.GMAIL_LABELS || 'label1,label2,label3,Invoices,Receipts,Documents'}}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "spreadsheetId",
+              "value": "={{$env.GMAIL_SHEET_ID || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "sheetName",
+              "value": "={{$env.GMAIL_SHEET_NAME || 'Email Log'}}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "driveRootFolderId",
+              "value": "={{$env.GMAIL_DRIVE_ROOT_FOLDER_ID || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "lookbackWindow",
+              "value": "={{$env.GMAIL_LOOKBACK_WINDOW || '1d'}}",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "timezone",
+              "value": "={{$env.WORKFLOW_TIMEZONE || 'Asia/Manila'}}",
+              "type": "string"
+            },
+            {
+              "id": "a7",
+              "name": "dateFormat",
+              "value": "={{$env.DATE_FORMAT || 'YYYY-MM-DD'}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "55e72167-a130-437b-8428-7826d75e62d3",
       "name": "Config \u2014 Load Settings",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 1,
+      "typeVersion": 3.4,
       "position": [
         260,
         0
@@ -87,7 +132,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Turn the comma-separated label config into one item per label so\n// every downstream node (Gmail search, etc.) simply runs once per item.\nconst cfg = $('Config \u2014 Load Settings').first().json;\nconst labels = cfg.gmailLabelsCsv.split(',').map(l => l.trim()).filter(Boolean);\nreturn labels.map(label => ({ json: { ...cfg, label } }));"
+        "jsCode": "// Turn the comma-separated label config into one item per label so\n// every downstream node (Gmail search, etc.) simply runs once per item.\n// Defensive: if the Config node produced no items or no labels, no-op gracefully.\nconst cfgNode = $('Config \u2014 Load Settings').first();\nconst cfg = (cfgNode && cfgNode.json) || {};\nconst csv = cfg.gmailLabelsCsv || 'label1,label2,label3';\nconst labels = String(csv).split(',').map(l => l.trim()).filter(Boolean);\nreturn labels.map(label => ({ json: { ...cfg, label } }));"
       },
       "id": "e866cd58-173f-4064-a1e2-c7a1cf9bdfaf",
       "name": "Code \u2014 Expand Labels To Items",
