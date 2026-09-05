@@ -248,6 +248,25 @@ npm install n8n
 
 Once n8n is up, open `http://localhost:5678` and create the owner account.
 
+> **If you see `n8n's port 5678 is already in use. Do you have another
+> instance of n8n running already?`** — another n8n process is still
+> holding the port. Kill it first, then start n8n again:
+>
+> ```powershell
+> # PowerShell — kill all n8n-related node processes
+> Get-Process -Name "node" -ErrorAction SilentlyContinue | Stop-Process -Force
+> Start-Sleep -Seconds 3
+> ```
+>
+> ```cmd
+> :: cmd — find and kill whatever is holding port 5678
+> for /f "tokens=5" %a in ('netstat -ano ^| findstr :5678') do taskkill /PID %a /F
+> ```
+>
+> Then start n8n in the **same** terminal and **leave that terminal
+> open** — closing the window kills n8n. The editor stays reachable at
+> `http://localhost:5678` from any browser.
+
 # 5. For shortcut 
 cmd.exe /c "set NODE_PATH=C:\n8n-deps\node_modules&& set N8N_USER_FOLDER=C:\n8n-install\.n8n&& C:\n8n-install\node_modules\.bin\n8n.cmd start"
 
