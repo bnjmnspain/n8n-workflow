@@ -17,12 +17,35 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "id": "",
           "name": "Telegram"
         }
       },
-      "notes": "Fires on every message sent to the bot. Attach the Telegram Bot credential (TELEGRAM_BOT_TOKEN) after import.",
-      "notesInFlow": false
+      "notes": "Fires on every message sent to the bot. Attach the Telegram Bot credential (TELEGRAM_BOT_TOKEN) after import."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "b1", "name": "receiptFieldsCsv", "value": "={{$env.RECEIPT_FIELDS || 'merchant_name,amount,currency,date,receipt_number,tax,subtotal,payment_method,confidence'}}", "type": "string" },
+            { "id": "b2", "name": "geminiModel", "value": "={{$env.GEMINI_MODEL || 'gemini-2.0-flash'}}", "type": "string" },
+            { "id": "b3", "name": "geminiApiKey", "value": "={{$env.GEMINI_API_KEY || ''}}", "type": "string" },
+            { "id": "b4", "name": "spreadsheetId", "value": "={{$env.RECEIPTS_SHEET_ID || ''}}", "type": "string" },
+            { "id": "b5", "name": "sheetName", "value": "={{$env.RECEIPTS_SHEET_NAME || 'Receipts'}}", "type": "string" },
+            { "id": "b6", "name": "driveRootFolderId", "value": "={{$env.RECEIPTS_DRIVE_ROOT_FOLDER_ID || ''}}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c0f1aaaa-0001-4000-8000-000000000001",
+      "name": "Config \u2014 Load Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Bridges env vars into the workflow as a normal data item. Code nodes read from here (they can't read $env directly in restricted mode)."
     },
     {
       "parameters": {
@@ -70,7 +93,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "id": "",
           "name": "Telegram"
         }
       },
@@ -176,7 +199,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "id": "",
           "name": "Telegram"
         }
       },
@@ -202,7 +225,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "id": "",
           "name": "Telegram"
         }
       },
@@ -211,7 +234,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const binary = $binary.data;\nconst base64 = binary.data; // n8n stores binary as base64 already\nconst mimeType = binary.mimeType || 'image/jpeg';\n\nconst fields = ($env.RECEIPT_FIELDS ||\n  'merchant_name,amount,currency,date,receipt_number,tax,subtotal,payment_method,confidence'\n).split(',').map(f => f.trim());\n\nconst prompt = `You are extracting structured data from a photo of a retail receipt.\\n`\n  + `Return ONLY a single JSON object (no markdown fences, no commentary) with exactly these fields: ${fields.join(', ')}.\\n`\n  + `- amount, tax and subtotal must be numbers (no currency symbols).\\n`\n  + `- date must be ISO format YYYY-MM-DD if legible, otherwise null.\\n`\n  + `- confidence is your own 0-1 estimate of extraction reliability.\\n`\n  + `- Use null for any field you cannot read.`;\n\nreturn [{\n  json: { ...$json, geminiPrompt: prompt, base64Image: base64, mimeType },\n  binary: $binary,\n}];"
+        "jsCode": "const binary = $binary.data;\nconst base64 = binary.data; // n8n stores binary as base64 already\nconst mimeType = binary.mimeType || 'image/jpeg';\n\n// Read config from the upstream Set node, not $env (which is blocked in restricted Code nodes).\nconst cfg = ($('Config \u2014 Load Settings').first() && $('Config \u2014 Load Settings').first().json) || {};\nconst fields = String(cfg.receiptFieldsCsv ||\n  'merchant_name,amount,currency,date,receipt_number,tax,subtotal,payment_method,confidence'\n).split(',').map(f => f.trim());\n\nconst prompt = `You are extracting structured data from a photo of a retail receipt.\\n`\n  + `Return ONLY a single JSON object (no markdown fences, no commentary) with exactly these fields: ${fields.join(', ')}.\\n`\n  + `- amount, tax and subtotal must be numbers (no currency symbols).\\n`\n  + `- date must be ISO format YYYY-MM-DD if legible, otherwise null.\\n`\n  + `- confidence is your own 0-1 estimate of extraction reliability.\\n`\n  + `- Use null for any field you cannot read.`;\n\nreturn [{\n  json: { ...$json, geminiPrompt: prompt, base64Image: base64, mimeType, geminiModel: cfg.geminiModel, geminiApiKey: cfg.geminiApiKey },\n  binary: $binary,\n}];"
       },
       "id": "927ef183-bdf8-4e5e-aec6-0c627b9b680d",
       "name": "Code \u2014 Prepare Gemini Request",
@@ -225,13 +248,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{$env.GEMINI_MODEL || 'gemini-2.0-flash'}}:generateContent",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{$json.geminiModel || 'gemini-2.0-flash'}}:generateContent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-goog-api-key",
-              "value": "={{$env.GEMINI_API_KEY}}"
+              "value": "={{$json.geminiApiKey}}"
             }
           ]
         },
@@ -306,7 +329,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       },
@@ -336,7 +359,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       }
@@ -379,7 +402,7 @@
       "notes": "Uploads the untouched original photo \u2014 never the AI-processed version.",
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       }
@@ -459,7 +482,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL_ID",
+          "id": "",
           "name": "Telegram"
         }
       },
@@ -469,6 +492,17 @@
   ],
   "connections": {
     "Telegram \u2014 Receive Message": {
+      "main": [
+        [
+          {
+            "node": "Config \u2014 Load Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config \u2014 Load Settings": {
       "main": [
         [
           {

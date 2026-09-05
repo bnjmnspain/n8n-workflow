@@ -49,7 +49,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       },
@@ -79,7 +79,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       },
@@ -119,7 +119,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       },
@@ -148,7 +148,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       }
@@ -187,7 +187,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       },
@@ -216,7 +216,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       }
@@ -274,7 +274,7 @@
       "notes": "Preserves the raw attachment bytes as binary data 'data'.",
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "id": "",
           "name": "Gmail OAuth2"
         }
       }
@@ -304,7 +304,7 @@
       "notes": "Filename comes straight from the original Gmail attachment metadata \u2014 never renamed.",
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE_WITH_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "id": "",
           "name": "Google Drive OAuth2"
         }
       }
