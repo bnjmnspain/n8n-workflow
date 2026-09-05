@@ -69,136 +69,7 @@ API, Google Drive API v3, Telegram Bot API, Google Gemini API
 
 ---
 
-## 2. Architecture
-
-### Workflow 1 — Gmail Multi-Label → Sheets + Drive
-
-```
-Schedule (every N min)
-        │
-        ▼
-Config — env-driven settings (labels, sheet id, drive root, lookback)
-        │
-        ▼
-Sheets — read existing Message IDs  ──▶  Code — build de-dup set
-        │
-        ▼
-Code — expand configured labels into one item per label
-        │
-        ▼
-Gmail — search messages "label:<X> newer_than:<window>"   (runs once per label)
-        │
-        ▼
-Code — normalize email (sender/recipient/subject/date/attachments, isDuplicate flag)
-        │
-        ▼
-IF — already processed?  ──yes──▶  Skip (NoOp)
-        │ no
-        ▼
-IF — has attachments?
-   │ yes                              │ no
-   ▼                                  ▼
-Execute Workflow:                Code — set empty drive fields
-"Sub — Upload Gmail Attachments"      │
-   │                                  │
-   └──────────────┬───────────────────┘
-                   ▼
-        Code — merge result, set Processing Status
-                   ▼
-        Sheets — append row to Email Log
-```
-
-**Sub-workflow — Upload Gmail Attachments** (called once per email that has
-attachments):
-
-```
-Execute Workflow Trigger (receives messageId, label, sender, date, attachments[])
-        ▼
-Code — sanitize label / date / sender folder names
-        ▼
-Drive — Create Label folder   ──▶   Drive — Lookup Label folder   ──▶   Code — Resolve Label Folder Id
-                                                                                  │
-Drive — Create Date folder    ──▶   Drive — Lookup Date folder    ──▶   Code — Resolve Date Folder Id
-                                                                                  │
-Drive — Create Sender folder  ──▶   Drive — Lookup Sender folder  ──▶   Code — Resolve Sender Folder Id
-                                                                                  ▼
-                                                                       Split — one item per attachment
-                                                                                  ▼
-                                                                       Gmail — download attachment
-                                                                                  ▼
-                                                                       Drive — upload (original filename)
-                                                                                  ▼
-                                                                       Aggregate — collect uploads
-                                                                                  ▼
-                                                                       Code — build final result
-```
-
-Each folder level uses the native `googleDrive` node (with the Google Drive
-OAuth2 credential) for both `folder:create` and `folder:list`, then a tiny
-Code node picks the existing id or the just-created id and forwards it
-downstream. We can't use a single `folder:create` because Drive's create
-endpoint fails with "folder already exists" instead of being idempotent.
-
-Resulting Drive layout:
-
-```
-Gmail Attachments/
-  └── Invoices/
-        └── 2026-09-04/
-               └── Benjamin/
-                    ├── invoice.pdf
-                    └── receipt.jpg
-```
-
-### Workflow 2 — Telegram Receipt → Gemini → Sheets + Drive
-
-```
-Telegram Trigger — new message
-        ▼
-IF — is it a photo?  ──no──▶ Telegram — reply "please send a receipt photo"
-        │ yes
-        ▼
-Sheets — read existing (Chat ID, Telegram Message ID) pairs
-        ▼
-Code — build de-dup key, check membership
-        ▼
-IF — already processed?  ──yes──▶ Skip (NoOp)
-        │ no
-        ▼
-Telegram — get file info (largest photo size) → download photo (binary)
-        ▼
-Code — build Gemini prompt + base64 image
-        ▼
-HTTP Request — Gemini generateContent (response_mime_type: application/json)
-        ▼
-Code — parse & validate JSON, fall back to Error status on bad/incomplete output
-        ▼
-Code — build filename (preserve if present, else receipt_YYYY-MM-DD_HHMMSS.ext)
-        ▼
-Code — get-or-create "<YYYY-MM-DD>" Drive folder
-        ▼
-Drive — upload ORIGINAL photo (never the AI-processed version)
-        ▼
-Code — merge final row + Processing Status
-        ▼
-Sheets — append row to Receipts
-        ▼
-Telegram — send confirmation (merchant + amount, or a "couldn't read it" note)
-```
-
-Resulting Drive layout:
-
-```
-Receipt Photos/
-  └── 2026-09-04/
-        ├── receipt.jpg
-        ├── IMG_1023.jpg
-        └── receipt_2026-09-04_121530.jpg
-```
-
----
-
-## 3. Quick Start — Testing Locally
+## 2. Quick Start — Testing Locally
 
 Want to see the workflows run before wiring up real credentials? Here's the
 fastest path on Windows.
@@ -355,13 +226,13 @@ must match exactly — the Sheets nodes map by header.
 
 ---
 
-## 4. Configuration
+## 3. Configuration
 
 Every value called out in the assessment is environment-driven — see
 `CONFIGURATION.md` for the full table and `.env.example` for a ready-to-copy
 file. Nothing required to change is hard-coded inside the workflow JSON.
 
-## 5. Duplicate Prevention
+## 4. Duplicate Prevention
 
 - **Workflow 1:** Gmail **Message ID** is the identity. The log sheet is read
   once per scheduled run; a Code node builds a `Set` of already-logged
@@ -375,7 +246,7 @@ Both intentionally avoid the "Sheets lookup filtered by value" pattern for
 the reason explained in the Executive Summary — it fails silently on the
 exact case (not a duplicate) you need it to pass.
 
-## 6. Error Handling
+## 5. Error Handling
 
 `continueOnFail` is set on every node that calls an external API (Gmail
 search/download, Sheets read/append, Drive folder/upload, Telegram send,
@@ -385,13 +256,13 @@ error-message columns rather than throwing — so one bad email or one
 unreadable receipt never stops the batch. See `TESTING.md` for the specific
 failure cases exercised.
 
-## 7. Testing
+## 6. Testing
 
 See `TESTING.md` for the full test matrix (attachment counts, per-label
 coverage, duplicate messages, missing sender, bad/blurry receipts, non-photo
 messages, Gemini/Drive failures).
 
-## 8. Files In This Portfolio
+## 7. Files In This Portfolio
 
 ```
 workflows/
