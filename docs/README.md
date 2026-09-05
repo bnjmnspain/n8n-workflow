@@ -99,7 +99,7 @@ IF — has attachments?
    │ yes                              │ no
    ▼                                  ▼
 Execute Workflow:                Code — set empty drive fields
-"Sub — Upload Gmail Attachments"       │
+"Sub — Upload Gmail Attachments"      │
    │                                  │
    └──────────────┬───────────────────┘
                    ▼
@@ -231,8 +231,13 @@ npm install n8n
 # 4. Start n8n. The first run takes ~30s while it migrates the DB.
 .\node_modules\.bin\n8n.cmd start
 ```
-
 Once n8n is up, open `http://localhost:5678` and create the owner account.
+
+# 5. For shortcut 
+cmd.exe /c "set NODE_PATH=C:\n8n-deps\node_modules&& set N8N_USER_FOLDER=C:\n8n-install\.n8n&& C:\n8n-install\node_modules\.bin\n8n.cmd start"
+
+then press "o" for to openn browsers
+
 
 > **Tip — keep n8n between sessions.** Add a PowerShell function to your
 > profile (`notepad $PROFILE`) so you can re-start with one command:
@@ -259,19 +264,18 @@ double-click the **Run — Upload Gmail Attachments** node. In the **Workflow**
 dropdown, pick **"Sub — Upload Gmail Attachments"** — n8n assigns internal
 IDs at import time, so this link must be re-made manually.
 
-### 3c. Wire up the credential placeholders
+### 3c. Wire up the credentials
 
-Each workflow JSON contains placeholder credential IDs in the form
-`"REPLACE_WITH_*_CREDENTIAL_ID"`. After import:
+After import, every node that needs a credential will show a red "no
+credential" warning. To fix:
 
 1. **Settings → Credentials → New** and create:
    - **Gmail OAuth2** (Google Cloud project with Gmail API enabled)
    - **Google Sheets OAuth2** (Sheets API enabled)
    - **Google Drive OAuth2** (Drive API enabled)
    - **Telegram** (token from `@BotFather` → `/newbot`)
-2. Open every node that shows a red "no credential" warning and pick the
-   matching credential from its dropdown. The fastest way is to search the
-   canvas for nodes with the red badge.
+2. Open every node that shows a red badge and pick the matching credential
+   from its dropdown. n8n fills in the credential ID automatically.
 
 > The placeholder values in the JSON are deliberate — they make it obvious
 > on import which nodes need a credential, instead of silently failing at
