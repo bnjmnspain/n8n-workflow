@@ -231,6 +231,21 @@ npm install n8n
 # 4. Start n8n. The first run takes ~30s while it migrates the DB.
 .\node_modules\.bin\n8n.cmd start
 ```
+
+> **Important — required `.env` flag.** Recent n8n versions block `$env.*`
+> reads in workflow expressions by default. These workflows read
+> `GMAIL_LABELS`, `GMAIL_SHEET_ID`, `RECEIPTS_SHEET_ID`, `GEMINI_API_KEY`,
+> etc. from env vars, so before starting n8n create
+> `C:\n8n-install\.n8n\.env` with this single line:
+>
+> ```ini
+> N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+> ```
+>
+> n8n reads it automatically on startup. Without this, every node that
+> reads an env var (the `Config — Load Settings` Set node in particular)
+> will throw `access to env vars denied`.
+
 Once n8n is up, open `http://localhost:5678` and create the owner account.
 
 # 5. For shortcut 
